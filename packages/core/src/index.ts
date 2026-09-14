@@ -6,3 +6,5 @@ export * from "./flight";
 export * from "./acoustics";
 export * from "./recipe";
 export * from "./experience";
+export * from "./airspace";
+export * from "./tower";

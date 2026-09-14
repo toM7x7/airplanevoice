@@ -1,18 +1,23 @@
 import {
   clamp,
-  type SoundArrival,
+  type FlightArrival,
+  type FlightId,
   type Vec3,
 } from "../../../packages/core/src";
 
 // Temporary, locally synthesized sound. No recordings or external media.
-// Four overlapping grains share a bounded node budget and explicit envelopes.
+// Each aircraft has its own bounded voice budget and a smoothly mixed bus.
 export class AircraftAudio {
   context: AudioContext | null = null;
   private master: GainNode | null = null;
   private buffer: AudioBuffer | null = null;
+  private buses = new Map<FlightId, GainNode>();
+  mixGains: Partial<Record<FlightId, number>> = { "ST-01": 1 };
+  playedByFlight: Partial<Record<FlightId, number>> = {};
   private voices = new Set<{
     source: AudioBufferSourceNode;
     nodes: AudioNode[];
+    flightId: FlightId;
   }>();
   private volume = 0.35;
   private muted = false;
@@ -20,6 +25,32 @@ export class AircraftAudio {
   skipped = 0;
   get activeVoices() {
     return this.voices.size;
+  }
+  setMix(gains: Partial<Record<FlightId, number>>) {
+    this.mixGains = { ...gains };
+    if (this.context)
+      for (const [id, bus] of this.buses) {
+        bus.gain.setTargetAtTime(
+          gains[id] ?? 0,
+          this.context.currentTime,
+          0.25,
+        );
+      }
+  }
+  private bus(id: FlightId): GainNode {
+    let bus = this.buses.get(id);
+    if (!bus) {
+      bus = this.context!.createGain();
+      bus.gain.value = this.mixGains[id] ?? 0;
+      bus.connect(this.master!);
+      this.buses.set(id, bus);
+    }
+    return bus;
+  }
+  get busLevels() {
+    return Object.fromEntries(
+      [...this.buses].map(([id, bus]) => [id, bus.gain.value]),
+    );
   }
   async enable(): Promise<void> {
     if (!this.context) {
@@ -85,7 +116,7 @@ export class AircraftAudio {
     l.upY.value = up.y;
     l.upZ.value = up.z;
   }
-  play(arrival: SoundArrival, nowMs: number, lowGain: number) {
+  play(arrival: FlightArrival, nowMs: number, lowGain: number) {
     if (
       !this.context ||
       !this.buffer ||
@@ -94,7 +125,14 @@ export class AircraftAudio {
     )
       return;
     // Drop stale events after suspension/tab throttling, never burst old audio.
-    if (nowMs - arrival.arrivalAtMs > 250 || this.voices.size >= 8) {
+    const ownVoices = [...this.voices].filter(
+      (v) => v.flightId === arrival.flightId,
+    ).length;
+    if (
+      nowMs - arrival.arrivalAtMs > 250 ||
+      this.voices.size >= 18 ||
+      ownVoices >= 6
+    ) {
       this.skipped++;
       return;
     }
@@ -130,16 +168,26 @@ export class AircraftAudio {
       .connect(bass)
       .connect(gain)
       .connect(panner)
-      .connect(this.master);
-    const voice = { source, nodes: [source, filter, bass, gain, panner] };
+      .connect(this.bus(arrival.flightId));
+    const voice = {
+      source,
+      nodes: [source, filter, bass, gain, panner],
+      flightId: arrival.flightId,
+    };
     this.voices.add(voice);
     source.onended = () => {
       voice.nodes.forEach((n) => n.disconnect());
       this.voices.delete(voice);
     };
-    source.start(time, (arrival.emission.id * 0.1) % 3);
+    source.start(
+      time,
+      (arrival.emission.id * 0.1 + Number(arrival.flightId.slice(-1)) * 0.37) %
+        3,
+    );
     source.stop(time + 0.35);
     this.played++;
+    this.playedByFlight[arrival.flightId] =
+      (this.playedByFlight[arrival.flightId] ?? 0) + 1;
   }
   stop() {
     for (const v of this.voices) {
@@ -150,6 +198,8 @@ export class AircraftAudio {
   }
   dispose() {
     this.stop();
+    this.buses.forEach((bus) => bus.disconnect());
+    this.buses.clear();
     void this.context?.close();
   }
 }

@@ -28,7 +28,7 @@ function wingGeometry(side: number, tail = false) {
   g.rotateX(Math.PI / 2);
   return g;
 }
-export function Aircraft() {
+export function Aircraft({ accent = "#205963" }: { accent?: string }) {
   const body = useMemo(
     () =>
       new THREE.LatheGeometry(
@@ -94,7 +94,7 @@ export function Aircraft() {
         </mesh>
       ))}
       <mesh geometry={fin} position={[0, 1.5, 0]}>
-        <meshStandardMaterial color="#205963" side={THREE.DoubleSide} />
+        <meshStandardMaterial color={accent} side={THREE.DoubleSide} />
       </mesh>
       {[-1, 1].flatMap((side) =>
         [13, 23].map((x, i) => (

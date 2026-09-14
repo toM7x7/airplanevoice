@@ -18,6 +18,7 @@ import {
 import { AircraftAudio } from "./audio";
 import { Scene, type ViewState } from "./Scene";
 import { RouteEditor } from "./RouteEditor";
+import { AirspaceControls } from "./AirspaceControls";
 
 function Icon({
   name,
@@ -198,11 +199,22 @@ export function App() {
       [
         JSON.stringify(
           {
-            version: "0.1.0",
+            version: "0.2.0",
             platform: "desktop-local",
             route: e.spec,
             recipe: e.recipe,
-            audio: { played: audio.played, skipped: audio.skipped },
+            airspace: e.airspace,
+            listening: {
+              mode: e.mixMode,
+              focusId: e.focusId,
+              gains: e.mixGains,
+            },
+            tower: { enabled: e.tower.enabled, provider: "local-rules" },
+            audio: {
+              played: audio.played,
+              skipped: audio.skipped,
+              playedByFlight: audio.playedByFlight,
+            },
             events: e.logs,
           },
           null,
@@ -218,6 +230,15 @@ export function App() {
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
+  useEffect(() => {
+    audio.setMix(e.mixGains);
+  }, [
+    audio,
+    e,
+    snapshot.mixMode,
+    snapshot.focusId,
+    snapshot.airspace.aircraftCount,
+  ]);
   useEffect(() => {
     e.onArrival = (arrival, now) =>
       audio.play(arrival, now, e.recipe.lowFrequencyGain);
@@ -238,6 +259,9 @@ export function App() {
           played: audio.played,
           skipped: audio.skipped,
           activeVoices: audio.activeVoices,
+          playedByFlight: audio.playedByFlight,
+          mixGains: audio.mixGains,
+          busLevels: audio.busLevels,
         },
         render: window.__soundTrailRender,
         view: view.current,
@@ -308,7 +332,9 @@ export function App() {
   );
 
   return (
-    <main className={`app ${editing ? "is-editing" : "is-flying"}`}>
+    <main
+      className={`app ${editing ? "is-editing" : "is-flying"} ${e.airspace.aircraftCount > 1 ? "has-fleet" : ""}`}
+    >
       <header className="topbar">
         <a className="brand" href="./" aria-label="音航跡 ホーム">
           <span className="brand-mark">
@@ -320,7 +346,7 @@ export function App() {
         </a>
         <div className="top-actions">
           <span className="edition">
-            DESKTOP STUDY <span>01</span>
+            DESKTOP STUDY <span>02</span>
           </span>
           <button
             className="quiet-button"
@@ -354,6 +380,7 @@ export function App() {
                 あとの音まで、待ってみる。
               </p>
             </div>
+            <AirspaceControls experience={e} />
             {editing ? (
               <>
                 <div className="section-label">
@@ -492,23 +519,27 @@ export function App() {
                       : "次の一周は、最初の響きに戻ります。"
                     : "空をドラッグして見回せます。\n目のボタンで、少し近くに。"}
                 </p>
-                {interlap ? (
-                  <button className="primary" onClick={() => void play(true)}>
-                    <Icon name="play" size={16} />
-                    <span>もう一周、眺める</span>
-                  </button>
-                ) : (
-                  <button className="secondary" onClick={pause}>
-                    <Icon name={snapshot.paused ? "play" : "pause"} size={16} />
-                    {snapshot.paused ? "飛行を再開" : "ひと休み"}
-                  </button>
-                )}
-                <button className="text-button" onClick={edit}>
-                  航路を描き直す <Icon name="arrow" size={14} />
-                </button>
               </div>
             )}
           </div>
+          {!editing && (
+            <div className="flight-controls">
+              {interlap ? (
+                <button className="primary" onClick={() => void play(true)}>
+                  <Icon name="play" size={16} />
+                  <span>もう一周、眺める</span>
+                </button>
+              ) : (
+                <button className="secondary" onClick={pause}>
+                  <Icon name={snapshot.paused ? "play" : "pause"} size={16} />
+                  {snapshot.paused ? "飛行を再開" : "ひと休み"}
+                </button>
+              )}
+              <button className="text-button" onClick={edit}>
+                航路を描き直す <Icon name="arrow" size={14} />
+              </button>
+            </div>
+          )}
           {editing && (
             <div className="launch-controls">
               <button
@@ -521,8 +552,7 @@ export function App() {
                 <span className="keycap">↵</span>
               </button>
               <p className="start-note">
-                一周 約{Math.round(e.route.durationMs / 1000)}秒 ·
-                ヘッドホン推奨
+                飛行 約{Math.round(e.durationMs / 1000)}秒 · ヘッドホン推奨
               </p>
             </div>
           )}
@@ -573,7 +603,11 @@ export function App() {
             <div className="sky-caption">
               <span>OBSERVATION FIELD</span>
               <h2>あの音が届くまで。</h2>
-              <p>一機の飛行機と、あなたの空。</p>
+              <p>
+                {e.airspace.aircraftCount === 1
+                  ? "一機の飛行機と、あなたの空。"
+                  : "いくつもの響きが行き交う、あなたの空。"}
+              </p>
             </div>
           )}
           {snapshot.phase === "COMPILE" && (
@@ -588,6 +622,14 @@ export function App() {
               <button onClick={pause}>飛行を再開する</button>
             </div>
           )}
+          <div className="tower-caption" aria-live="polite" aria-atomic="true">
+            {!snapshot.paused && snapshot.towerCue && (
+              <div>
+                <span>管制案内</span>
+                <p>{snapshot.towerCue.text}</p>
+              </div>
+            )}
+          </div>
           <div className="horizon-note">
             58 m/s <span>／</span> FOUR ENGINES <span>／</span> ONE OPEN SKY
           </div>
@@ -651,7 +693,7 @@ export function App() {
         >
           音・表示の設定 <span>{diagnostics ? "−" : "+"}</span>
         </button>
-        <span className="version">S0 · v0.1</span>
+        <span className="version">AIRSPACE · v0.2</span>
       </footer>
       {diagnostics && (
         <section className="settings" aria-label="音と表示の設定">
@@ -712,7 +754,7 @@ export function App() {
               <dd>{snapshot.checksum}</dd>
             </dl>
             <p>
-              この版はPCでの一人用試作です。機体・合成音は検証用。Questと二人同期は今後の段階です。
+              この版はPCでの一人用試作です。最大3機で聴き比べられます。管制字幕は飛行状況に応じた定型案内で、AIは未接続です。Questでの共有は今後の段階です。
             </p>
             <button className="text-button" onClick={exportLogs}>
               この体験のログを保存 <Icon name="arrow" size={14} />

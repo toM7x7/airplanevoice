@@ -34,9 +34,179 @@ button:disabled {
 }
 button:focus-visible,
 a:focus-visible,
+select:focus-visible,
 input:focus-visible {
   outline: 2px solid #b56542;
   outline-offset: 4px;
+}
+.airspace-controls {
+  margin: 2px 0 25px;
+  padding: 16px 0;
+  border-top: 1px solid #d9ded4;
+  border-bottom: 1px solid #d9ded4;
+}
+.is-flying.has-fleet .sidebar-heading,
+.is-flying.has-fleet .flight-diagram {
+  display: none;
+}
+.is-flying.has-fleet .flight-thought {
+  font-size: 24px;
+  margin: 20px 0 10px;
+}
+.flight-controls {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  width: 100%;
+  padding-top: 12px;
+  background: #f5f4ee;
+}
+.flight-controls .text-button {
+  padding: 12px 0 4px;
+}
+.flight-explain {
+  margin-bottom: 16px;
+}
+.airspace-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.airspace-heading h2 {
+  font-size: 12px;
+  margin: 0;
+  font-weight: 600;
+}
+.airspace-heading > span {
+  font:
+    9px Consolas,
+    monospace;
+  color: #7e8b80;
+  letter-spacing: 0.12em;
+}
+.segmented {
+  display: flex;
+  gap: 4px;
+  background: #e9ece3;
+  padding: 3px;
+  border-radius: 5px;
+}
+.segmented button {
+  flex: 1;
+  border-radius: 3px;
+  min-height: 32px;
+  font-size: 12px;
+}
+.segmented button[aria-pressed="true"] {
+  background: #fffef8;
+  box-shadow: 0 1px 4px #284a3016;
+  color: #205963;
+}
+.segmented button:disabled[aria-pressed="true"] {
+  opacity: 0.85;
+}
+.spacing-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  margin: 12px 0;
+}
+.spacing-label select {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  padding: 5px;
+  border: 1px solid #c3cec0;
+  border-radius: 4px;
+}
+.listening-mode button {
+  font-size: 11px;
+}
+.flight-picker {
+  display: flex;
+  gap: 5px;
+  margin-top: 10px;
+}
+.flight-picker button {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid #d9ded4;
+  border-radius: 4px;
+  padding: 9px 2px 7px;
+  font-size: 11px;
+}
+.flight-picker button[aria-pressed="true"] {
+  border-color: #809a8a;
+  background: #edf0e5;
+}
+.flight-picker i {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-right: 4px;
+}
+.flight-picker strong {
+  font:
+    11px Consolas,
+    monospace;
+}
+.flight-picker small {
+  display: block;
+  font-size: 9px;
+  color: #728073;
+  margin-top: 5px;
+}
+.airspace-hint {
+  font-size: 10px;
+  line-height: 1.7;
+  color: #748174;
+  margin: 10px 0 0;
+}
+.airspace-controls .tower-toggle {
+  margin: 12px 0 0;
+  font-size: 11px;
+}
+.tower-caption {
+  position: absolute;
+  bottom: 173px;
+  left: 32px;
+  right: 32px;
+  pointer-events: none;
+}
+.tower-caption > div {
+  width: fit-content;
+  max-width: 450px;
+  background: #16362edb;
+  border: 1px solid #a8c8b044;
+  padding: 13px 17px;
+  border-radius: 5px;
+  color: #ecf3e9;
+}
+.tower-caption span {
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: #b4cbb8;
+}
+.tower-caption p {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.75;
+}
+@media (max-width: 760px) {
+  .airspace-controls {
+    margin: 15px 0 20px;
+  }
+  .tower-caption {
+    bottom: 140px;
+    left: 20px;
+    right: 20px;
+  }
+  .tower-caption p {
+    font-size: 11px;
+  }
 }
 button svg {
   flex-shrink: 0;

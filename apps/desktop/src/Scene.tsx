@@ -1,7 +1,13 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, type MutableRefObject } from "react";
 import * as THREE from "three";
-import { Experience, clamp } from "../../../packages/core/src";
+import {
+  AIRCRAFT,
+  Experience,
+  clamp,
+  type FlightId,
+  type TrailPoint,
+} from "../../../packages/core/src";
 import { Aircraft } from "./Aircraft";
 import type { AircraftAudio } from "./audio";
 
@@ -101,7 +107,7 @@ function World({
   manual: MutableRefObject<boolean>;
   reduced: boolean;
 }) {
-  const aircraft = useRef<THREE.Group>(null);
+  const aircraft = useRef<(THREE.Group | null)[]>([]);
   const design = useRef<THREE.LineLoop>(null);
   const trail = useRef<THREE.LineSegments>(null);
   const rings = useRef<THREE.InstancedMesh>(null);
@@ -111,11 +117,11 @@ function World({
     const g = new THREE.BufferGeometry();
     g.setAttribute(
       "position",
-      new THREE.BufferAttribute(new Float32Array(128 * 2 * 3), 3),
+      new THREE.BufferAttribute(new Float32Array(384 * 2 * 3), 3),
     );
     g.setAttribute(
       "color",
-      new THREE.BufferAttribute(new Float32Array(128 * 2 * 3), 3),
+      new THREE.BufferAttribute(new Float32Array(384 * 2 * 3), 3),
     );
     g.setDrawRange(0, 0);
     return g;
@@ -186,23 +192,23 @@ function World({
     camera.getWorldDirection(temp.forward);
     temp.up.set(0, 1, 0).applyQuaternion(camera.quaternion);
     audio.setListener(e.listener, temp.forward, temp.up);
-    if (aircraft.current) {
-      const pose = e.pose();
-      aircraft.current.visible = e.phase === "EDIT" || e.phase === "FLY";
-      aircraft.current.position.set(
-        pose.position.x,
-        pose.position.y,
-        pose.position.z,
-      );
+    aircraft.current.forEach((mesh, index) => {
+      if (!mesh) return;
+      const f = e.flights[index];
+      mesh.visible =
+        e.phase === "EDIT" ? index === 0 : !!f && f.started && !f.ended;
+      if (!mesh.visible) return;
+      const pose = e.pose(AIRCRAFT[index].id);
+      mesh.position.set(pose.position.x, pose.position.y, pose.position.z);
       temp.tangent.set(pose.tangent.x, pose.tangent.y, pose.tangent.z);
       temp.right.crossVectors(UP, temp.tangent).normalize();
       temp.up.crossVectors(temp.tangent, temp.right).normalize();
       temp.matrix.makeBasis(temp.right, temp.up, temp.tangent);
       // Positive core bank means turning right; local +Z forward needs negative roll.
-      aircraft.current.quaternion
+      mesh.quaternion
         .setFromRotationMatrix(temp.matrix)
         .multiply(temp.bank.setFromAxisAngle(Z, -pose.bankRad));
-    }
+    });
     if (checksum.current !== e.route.checksum) {
       geometry.setFromPoints(
         e.route.samples.map(
@@ -218,11 +224,12 @@ function World({
     ) as THREE.BufferAttribute;
     const color = trailGeometry.getAttribute("color") as THREE.BufferAttribute;
     let count = 0;
-    for (let i = 1; i < e.trails.length; i++) {
-      const a = e.trails[i - 1],
-        b = e.trails[i];
+    const previous = new Map<FlightId, TrailPoint>();
+    for (const b of e.trails) {
+      const a = previous.get(b.flightId);
+      previous.set(b.flightId, b);
       // Arrival order may differ from emission order. Never connect distant samples.
-      if (Math.abs(a.emissionId - b.emissionId) !== 1) continue;
+      if (!a || Math.abs(a.emissionId - b.emissionId) !== 1) continue;
       const fade = Math.pow(
         Math.max(
           0,
@@ -278,9 +285,16 @@ function World({
         color="#fff3d7"
       />
       <Landscape />
-      <group ref={aircraft}>
-        <Aircraft />
-      </group>
+      {AIRCRAFT.map((a, index) => (
+        <group
+          key={a.id}
+          ref={(mesh) => {
+            aircraft.current[index] = mesh;
+          }}
+        >
+          <Aircraft accent={a.accent} />
+        </group>
+      ))}
       <primitive object={lineObject} ref={design} />
       <primitive object={trailObject} ref={trail} />
       <instancedMesh
