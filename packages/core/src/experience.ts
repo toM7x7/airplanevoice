@@ -22,6 +22,11 @@ import {
 import { OBSERVERS, presetRoute } from "./presets";
 import { selectRecipe, validRecipe } from "./recipe";
 import { compileRoute } from "./route";
+import {
+  evolveRoute,
+  EVOLUTION_REST_MS,
+  type EvolutionSettings,
+} from "./evolution";
 import type {
   CompiledRoute,
   EngineRecipe,
@@ -67,6 +72,12 @@ export interface ExperienceSnapshot {
   towerEnabled: boolean;
   towerCue: TowerCue | null;
   aircraftDesign: AircraftDesign;
+  evolution: EvolutionSettings & {
+    nextInSec: number | null;
+    error: string | null;
+    changed: boolean;
+    baseChecksum: string | null;
+  };
 }
 export interface LogEntry {
   atMs: number;
@@ -94,6 +105,11 @@ export class Experience {
   flights: FlightPlan[] = [];
   tower = new TowerDirector();
   aircraftDesign: AircraftDesign = { ...DEFAULT_AIRCRAFT };
+  evolution: EvolutionSettings = { enabled: false, amount: 0.65 };
+  private evolutionBase: { spec: RouteSpec; route: CompiledRoute } | null =
+    null;
+  private nextLapAtMs: number | null = null;
+  private evolutionError: string | null = null;
   onArrival?: (arrival: FlightArrival, nowMs: number) => void;
   private listeners = new Set<() => void>();
   private history: RouteSpec[] = [];
@@ -122,6 +138,22 @@ export class Experience {
   }
   get canUndo() {
     return this.canEdit && this.history.length > 0;
+  }
+  setEvolution(settings: EvolutionSettings) {
+    if (
+      typeof settings.enabled !== "boolean" ||
+      !Number.isFinite(settings.amount) ||
+      settings.amount < 0 ||
+      settings.amount > 1
+    )
+      throw new Error("変化の設定を確認してください。");
+    this.evolution = { ...settings };
+    this.evolutionError = null;
+    if (!settings.enabled) this.nextLapAtMs = null;
+    else if (this.phase === "INTERLAP" && this.nextLapAtMs === null)
+      this.nextLapAtMs = this.nowMs + EVOLUTION_REST_MS;
+    this.log("evolution_changed", { ...settings });
+    this.notify();
   }
   setAircraftDesign(design: AircraftDesign) {
     if (!this.canEdit) return;
@@ -204,6 +236,46 @@ export class Experience {
     if (this.phase !== "EDIT" && this.phase !== "INTERLAP") return;
     if (!validRecipe(selectRecipe(nextLap ? this.lap + 1 : 0, delayScale)))
       throw new Error("Invalid experience recipe");
+    if (!nextLap) {
+      this.evolutionBase = {
+        spec: structuredClone(this.spec),
+        route: this.route,
+      };
+      this.evolutionError = null;
+    } else if (this.evolution.enabled && this.evolutionBase) {
+      try {
+        const spec = evolveRoute(
+          this.evolutionBase.spec,
+          this.lap + 1,
+          this.evolution.amount,
+        );
+        const route = compileRoute(spec);
+        if (
+          route.notices.some((n) => n.includes("置き換え")) ||
+          route.samples.some(
+            (p) =>
+              Math.abs(p.position.x) > 6000 || Math.abs(p.position.z) > 6000,
+          )
+        )
+          throw new Error("次の航路が観察空域に収まりませんでした。");
+        this.spec = spec;
+        this.route = route;
+        this.log("route_evolved", {
+          lap: this.lap + 1,
+          checksum: route.checksum,
+          baseChecksum: this.evolutionBase.route.checksum,
+          amount: this.evolution.amount,
+        });
+      } catch (err) {
+        this.evolutionError = err instanceof Error ? err.message : String(err);
+        this.evolution = { ...this.evolution, enabled: false };
+        this.nextLapAtMs = null;
+        this.log("evolution_stopped", { reason: this.evolutionError });
+        this.notify();
+        return;
+      }
+    }
+    this.nextLapAtMs = null;
     this.lap = nextLap ? this.lap + 1 : 0;
     this.recipe = selectRecipe(this.lap, delayScale);
     this.startAtMs = this.nowMs + 2500;
@@ -239,7 +311,19 @@ export class Experience {
     });
     this.notify();
   }
-  edit() {
+  edit(keepCurrentRoute = false) {
+    if (this.evolutionBase && !keepCurrentRoute) {
+      this.spec = structuredClone(this.evolutionBase.spec);
+      this.route = this.evolutionBase.route;
+    }
+    if (keepCurrentRoute && this.evolutionBase) {
+      this.history.push(structuredClone(this.evolutionBase.spec));
+      if (this.history.length > 30) this.history.shift();
+      this.log("evolution_kept", { checksum: this.route.checksum });
+    }
+    this.evolutionBase = null;
+    this.nextLapAtMs = null;
+    this.evolutionError = null;
     this.phase = "EDIT";
     this.paused = false;
     this.flights = [];
@@ -254,6 +338,7 @@ export class Experience {
     this.edit();
     this.lap = 0;
     this.history = [];
+    this.evolution = { enabled: false, amount: 0.65 };
     this.recipe = selectRecipe(0);
     this.airspace = { aircraftCount: 1, spacingSec: 8 };
     this.mixMode = "focus";
@@ -271,7 +356,7 @@ export class Experience {
     this.notify();
   }
   togglePause() {
-    if (!["COMPILE", "FLY", "ARRIVAL"].includes(this.phase)) return;
+    if (this.phase === "EDIT") return;
     this.paused = !this.paused;
     this.log(this.paused ? "paused" : "resumed");
     this.notify();
@@ -343,6 +428,8 @@ export class Experience {
         this.flights.every((f) => f.queue.remaining === 0)
       ) {
         this.phase = "INTERLAP";
+        if (this.evolution.enabled)
+          this.nextLapAtMs = this.nowMs + EVOLUTION_REST_MS;
         this.log("arrival_completed");
         this.fact({
           type: "clear",
@@ -363,6 +450,13 @@ export class Experience {
       !focused.ended &&
       distance(this.pose(focused.id).position, this.listener) < 650;
     this.tower.advance(this.nowMs, nearPass);
+    if (
+      this.phase === "INTERLAP" &&
+      this.evolution.enabled &&
+      this.nextLapAtMs !== null &&
+      this.nowMs >= this.nextLapAtMs
+    )
+      this.start(this.recipe.delayScale, true);
     if (this.nowMs - this.notifyAt >= 100) {
       this.notifyAt = this.nowMs;
       this.notify();
@@ -422,6 +516,18 @@ export class Experience {
       towerEnabled: this.tower.enabled,
       towerCue: this.tower.cue,
       aircraftDesign: { ...this.aircraftDesign },
+      evolution: {
+        ...this.evolution,
+        nextInSec:
+          this.nextLapAtMs === null
+            ? null
+            : Math.max(0, this.nextLapAtMs - this.nowMs) / 1000,
+        error: this.evolutionError,
+        changed:
+          !!this.evolutionBase &&
+          this.route.checksum !== this.evolutionBase.route.checksum,
+        baseChecksum: this.evolutionBase?.route.checksum ?? null,
+      },
     };
   }
 }

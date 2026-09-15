@@ -8,6 +8,7 @@
 - `airspace.ts`: 1〜3機の計画、比較用航路の配置、開始間隔、機体別の音到来キュー、注目／全体のゲイン計算。
 - `tower.ts`: 型付き事実イベントから定型字幕を選ぶ。表示間隔、優先度、期限、近接時の抑制。
 - `observation.ts / AircraftInfo.tsx`: 機体の状態を読み取り、速度・進行方位・高さ・距離を表示。選択と音の注目は別々に管理。
+- `evolution.ts / EvolutionControls.tsx`: 基準航路・周回・変化量から次の案を生成。`Experience`で全機の音到来待ち、6秒の休み、自動再開・停止・保存を管理。`FlightMap`は現在の主航路とST-01を表示。
 - `experience.ts`: EDIT → COMPILE（開始前の余白）→ FLY → ARRIVAL → INTERLAP。Pause、Undo、Reset、ログ。
 - `recipe.ts`: 検証可能な演出値と、低音層を交互に変えるルール。
 - `workshop.ts`: 機体・2地点航路・飛行設定の共通JSON、値域検証、固定シードによる周期曲線。
@@ -55,7 +56,9 @@
 
 `npm run test:observation` は実際のクリック・ドラッグ・タッチ・キーボードで機体情報を検証する。3機の選択、待機・終了・Pause、視線と進行方位の分離、音の注目を維持すること、Reset・機数変更、リサイズ、狭い画面を確認し、`output/observation` に記録する。クリック判定は移動6px以内。画面に投影した選択範囲は半径16〜80pxで、タッチ時は最小22px。厳密な遮蔽判定はない。
 
-`npm run test:offline` は配布版で保存→通信遮断→再読み込み→設定復元→実時間の飛行・音声出力・機体情報→再接続を確認する。既定URLはpreviewの4173番。`SOUND_TRAIL_URL`を指定すると公開URLでも実行できる。
+`npm run test:evolution` は3機の音到来待ち、周回間のPause、自動継続とキャンセル、選択機の継続、生成中の保存値保持、6周のGPUリソース数、選んだ航路の保存・再読込、元への復帰、キーボード、狭い画面を検証し、`output/evolution`に記録する。非表示タブのハンドラーは、headless環境で`document.hidden`を一時的に模擬して検証する。
+
+`npm run test:offline` は配布版で保存→通信遮断→再読み込み→設定復元→実時間の飛行・音声出力・機体情報→自動で第2周へ→第2周の音到来・出力→再接続を確認する。早送りは使わず約2分かかる。既定URLはpreviewの4173番。`SOUND_TRAIL_URL`を指定すると公開URLでも実行できる。
 
 ## 人による受入確認
 

@@ -48,6 +48,13 @@ try {
   );
   assert.equal(state.aircraftDesign.wingSpanM, 77);
   assert.equal(state.offline.online, false);
+  const originalChecksum = state.checksum;
+  await page
+    .getByRole("checkbox", {
+      name: "周回ごとに変化して飛び続ける",
+      exact: true,
+    })
+    .check();
   await page.locator("#start-btn").click();
   await page.waitForFunction(
     () => JSON.parse(window.render_game_to_text()).arrivedCount > 0,
@@ -58,14 +65,24 @@ try {
   assert.equal(state.phase, "FLY");
   assert.equal(state.audio.state, "running");
   assert(state.audio.played > 0);
-  await page.getByRole("button", { name: "機体情報を表示", exact: true }).click();
-  await page.getByRole("button", { name: "この機体の方を向く", exact: false }).click();
-  await page.getByRole("button", { name: "機体情報を閉じる", exact: true }).click();
+  await page
+    .getByRole("button", { name: "機体情報を表示", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "この機体の方を向く", exact: false })
+    .click();
+  await page
+    .getByRole("button", { name: "機体情報を閉じる", exact: true })
+    .click();
   await page.waitForFunction(() =>
-    JSON.parse(window.render_game_to_text()).aircraftTargets.some((t) => t.id === "ST-01"),
+    JSON.parse(window.render_game_to_text()).aircraftTargets.some(
+      (t) => t.id === "ST-01",
+    ),
   );
   const target = await page.evaluate(() =>
-    JSON.parse(window.render_game_to_text()).aircraftTargets.find((t) => t.id === "ST-01"),
+    JSON.parse(window.render_game_to_text()).aircraftTargets.find(
+      (t) => t.id === "ST-01",
+    ),
   );
   const sky = await page.locator(".world").boundingBox();
   await page.mouse.click(sky.x + target.x, sky.y + target.y);
@@ -77,9 +94,55 @@ try {
   assert(Number.isFinite(state.inspection.headingDeg));
   assert(state.inspection.distanceM > 0);
   assert.equal(state.offline.online, false);
-  assert.equal(await page.locator(".version").textContent(), "WORKSHOP · v0.3.1");
+  assert.equal(
+    await page.locator(".version").textContent(),
+    "WORKSHOP · v0.4.0",
+  );
   await fs.mkdir("output/workshop", { recursive: true });
   await page.screenshot({ path: "output/workshop/06-offline.png" });
+  console.log(
+    "First offline flight and aircraft inspection passed; waiting for the next lap in real time.",
+  );
+  await page.waitForFunction(
+    () => JSON.parse(window.render_game_to_text()).lap === 1,
+    {},
+    { timeout: 180000 },
+  );
+  const next = await page.evaluate(() =>
+    JSON.parse(window.render_game_to_text()),
+  );
+  assert.notEqual(next.checksum, originalChecksum);
+  assert.equal(next.evolution.enabled, true);
+  await page.waitForFunction(
+    (played) => {
+      const s = JSON.parse(window.render_game_to_text());
+      return s.lap === 1 && s.arrivedCount > 0 && s.audio.played > played;
+    },
+    next.audio.played,
+    { timeout: 30000 },
+  );
+  state = await page.evaluate(() => JSON.parse(window.render_game_to_text()));
+  assert.equal(state.inspection.id, "ST-01");
+  assert.equal(state.inspection.state, "flying");
+  assert.equal(state.offline.online, false);
+  await page
+    .getByRole("button", { name: "この機体の方を向く", exact: false })
+    .click();
+  await page
+    .getByRole("img", { name: "現在の主航路を上から見た図" })
+    .scrollIntoViewIfNeeded();
+  await page.screenshot({ path: "output/workshop/07-offline-evolution.png" });
+  await page
+    .getByRole("checkbox", {
+      name: "周回ごとに変化して飛び続ける",
+      exact: true,
+    })
+    .uncheck();
+  assert.equal(
+    (await page.evaluate(() => JSON.parse(window.render_game_to_text())))
+      .evolution.enabled,
+    false,
+  );
   await context.setOffline(false);
   await page.waitForFunction(
     () => JSON.parse(window.render_game_to_text()).offline.online,
@@ -90,7 +153,12 @@ try {
     JSON.stringify({ passed: true, url, errors, state }, null, 2),
   );
   console.log(
-    JSON.stringify({ offline: "passed", url, played: state.audio.played }),
+    JSON.stringify({
+      offline: "passed",
+      url,
+      lap: state.lap + 1,
+      played: state.audio.played,
+    }),
   );
 } finally {
   await fs.mkdir("output/workshop", { recursive: true });

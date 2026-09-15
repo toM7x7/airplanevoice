@@ -299,6 +299,54 @@
     margin-top: 9px;
   }
 }
+.evolution-controls {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line, #d5dfd1);
+}
+.evolution-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  cursor: pointer;
+}
+.evolution-toggle input {
+  accent-color: #326861;
+}
+.evolution-controls .evolution-amount {
+  margin: 12px 0 0;
+  font-size: 11px;
+}
+.evolution-note {
+  margin: 10px 0 0;
+  font-size: 10px;
+  line-height: 1.8;
+  color: #738779;
+}
+.evolution-lap {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: 12px;
+  font-size: 10px;
+}
+.evolution-lap strong {
+  font-size: 22px;
+  font-weight: 400;
+  margin: 0 3px;
+}
+.evolution-lap span:last-child {
+  color: #738779;
+}
+.flight-diagram text {
+  font-size: 9px;
+  fill: currentColor;
+  letter-spacing: 1px;
+}
+.keep-route {
+  color: #326861;
+}
 .workshop-toggle {
   width: 100%;
   text-align: left;
@@ -456,8 +504,7 @@ input:focus-visible {
   border-top: 1px solid #d9ded4;
   border-bottom: 1px solid #d9ded4;
 }
-.is-flying.has-fleet .sidebar-heading,
-.is-flying.has-fleet .flight-diagram {
+.is-flying .sidebar-heading {
   display: none;
 }
 .is-flying.has-fleet .flight-thought {
@@ -1112,13 +1159,13 @@ input[type="range"] {
   padding-top: 10px;
 }
 .flight-diagram {
-  margin: 22px 10px 5px;
+  margin: 8px 10px 5px;
   color: #809b89;
 }
 .flight-diagram svg {
   display: block;
   width: 100%;
-  max-height: 180px;
+  max-height: 135px;
 }
 .flight-thought {
   white-space: pre-line;

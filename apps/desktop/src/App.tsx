@@ -24,6 +24,8 @@ import { RouteEditor } from "./RouteEditor";
 import { AirspaceControls } from "./AirspaceControls";
 import { Workshop } from "./Workshop";
 import { AircraftInfo } from "./AircraftInfo";
+import { EvolutionControls } from "./EvolutionControls";
+import { FlightMap } from "./FlightMap";
 
 function Icon({
   name,
@@ -195,6 +197,13 @@ export function App() {
     setInspectedId(null);
     e.edit();
   }
+  function keepRoute() {
+    audio.stop();
+    setInspectedId(null);
+    e.edit(true);
+    save();
+    notifyMessage("この周回の航路を残しました。編集して、また飛ばせます。");
+  }
   function pause() {
     e.togglePause();
     if (e.paused) audio.stop();
@@ -236,7 +245,7 @@ export function App() {
       [
         JSON.stringify(
           {
-            version: "0.3.1",
+            version: "0.4.0",
             platform: "desktop-local",
             route: e.spec,
             aircraftDesign: e.aircraftDesign,
@@ -346,11 +355,7 @@ export function App() {
   }, [e, audio, muted, offlineReady, online, inspectedId]);
   useEffect(() => {
     function onHidden() {
-      if (
-        document.hidden &&
-        ["FLY", "ARRIVAL", "COMPILE"].includes(e.phase) &&
-        !e.paused
-      ) {
+      if (document.hidden && e.phase !== "EDIT" && !e.paused) {
         e.togglePause();
         audio.stop();
       }
@@ -376,7 +381,7 @@ export function App() {
         event.preventDefault();
         void play(interlap);
       }
-      if (event.code === "Space" && active) {
+      if (event.code === "Space" && !editing) {
         event.preventDefault();
         pause();
       }
@@ -460,6 +465,7 @@ export function App() {
               </button>
             )}
             <AirspaceControls experience={e} />
+            <EvolutionControls experience={e} />
             {editing ? (
               workshop ? (
                 <Workshop
@@ -584,38 +590,24 @@ export function App() {
                   <h2>{phaseLabel}</h2>
                 </div>
                 <div className="flight-diagram">
-                  <svg viewBox="0 0 220 180" aria-hidden="true">
-                    <ellipse
-                      cx="110"
-                      cy="85"
-                      rx="89"
-                      ry="55"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="0.8"
-                      strokeDasharray="3 6"
-                    />
-                    <path d="m166 45 18 5-17 7 3-6z" fill="currentColor" />
-                    <path
-                      d="M80 139q30-23 60 0M88 149q22-17 44 0M98 159q12-9 24 0"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1"
-                    />
-                  </svg>
+                  <FlightMap experience={e} />
                 </div>
                 <p className="flight-thought">
                   {snapshot.phase === "COMPILE"
                     ? "線を手放すと、\n空は飛行機のものになる。"
                     : interlap
-                      ? "今の空を、\nもう一度見てみよう。"
+                      ? snapshot.evolution.enabled
+                        ? "少し違う空へ。\n次の飛行を待つ。"
+                        : "今の空を、\nもう一度見てみよう。"
                       : "姿は、先へ。\n音は、あとから。"}
                 </p>
                 <p className="flight-explain">
                   {interlap
-                    ? snapshot.lap % 2 === 0
-                      ? "次の一周は、低い響きを少しだけ深く。"
-                      : "次の一周は、最初の響きに戻ります。"
+                    ? snapshot.evolution.enabled
+                      ? "同じ航路をもとに、\n旋回と起伏を少しずつ変えて。"
+                      : snapshot.lap % 2 === 0
+                        ? "次の一周は、低い響きを少しだけ深く。"
+                        : "次の一周は、最初の響きに戻ります。"
                     : "空をドラッグして見回せます。\n目のボタンで、少し近くに。"}
                 </p>
               </div>
@@ -623,7 +615,7 @@ export function App() {
           </div>
           {!editing && (
             <div className="flight-controls">
-              {interlap ? (
+              {interlap && !snapshot.evolution.enabled && !snapshot.paused ? (
                 <button className="primary" onClick={() => void play(true)}>
                   <Icon name="play" size={16} />
                   <span>もう一周、眺める</span>
@@ -632,6 +624,11 @@ export function App() {
                 <button className="secondary" onClick={pause}>
                   <Icon name={snapshot.paused ? "play" : "pause"} size={16} />
                   {snapshot.paused ? "飛行を再開" : "ひと休み"}
+                </button>
+              )}
+              {snapshot.evolution.changed && (
+                <button className="text-button keep-route" onClick={keepRoute}>
+                  この航路を残して編集 <Icon name="arrow" size={14} />
                 </button>
               )}
               <button className="text-button" onClick={edit}>
@@ -821,7 +818,7 @@ export function App() {
         >
           音・表示の設定 <span>{diagnostics ? "−" : "+"}</span>
         </button>
-        <span className="version">WORKSHOP · v0.3.1</span>
+        <span className="version">WORKSHOP · v0.4.0</span>
       </footer>
       {diagnostics && (
         <section className="settings" aria-label="音と表示の設定">

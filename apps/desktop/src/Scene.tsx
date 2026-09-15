@@ -326,6 +326,7 @@ function World({
       calls: gl.info.render.calls,
       triangles: gl.info.render.triangles,
       geometries: gl.info.memory.geometries,
+      textures: gl.info.memory.textures,
     };
   });
   return (
