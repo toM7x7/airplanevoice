@@ -390,6 +390,7 @@ export class VrRuntime {
         nearest = { id, along };
     }
     if (nearest) this.act(nearest.id);
+    else this.act("clear");
   }
   private act(action: Action) {
     if (action === "primary") this.onPrimary();

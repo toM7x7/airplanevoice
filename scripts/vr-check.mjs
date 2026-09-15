@@ -205,6 +205,20 @@ try {
   await button(240, 350);
   assert.equal((await state()).inspection.id, "ST-01");
   record("Spatial aircraft button opens speed and heading information");
+  await button(800, 100);
+  assert.equal((await state()).inspection.id, "ST-01");
+  await aim([3000, 2000, 1000]);
+  await press();
+  s = await state();
+  assert.equal(s.inspection, null);
+  assert.equal(s.vr.selected, null);
+  assert.equal(s.vr.selectionMarkerVisible, false);
+  assert.equal(s.mixMode, "balanced");
+  assert.equal(s.phase, "EDIT");
+  record(
+    "Empty sky trigger clears selection and restores all-plane listening; panel gaps preserve selection",
+  );
+  await button(240, 350);
   await button(250, 243);
   await wait(() => JSON.parse(window.render_game_to_text()).phase !== "EDIT");
   await wait(

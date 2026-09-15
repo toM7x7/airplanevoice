@@ -1,6 +1,6 @@
 {
   "name": "sound-trail",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -21,21 +21,25 @@
     "test:offline": "node scripts/offline-check.mjs",
     "test:vr": "node scripts/vr-check.mjs",
     "test:audio": "node scripts/audio-output-check.mjs",
-    "test:trail": "node scripts/trail-visibility-check.mjs"
+    "test:trail": "node scripts/trail-visibility-check.mjs",
+    "test:transfer": "node scripts/transfer-check.mjs"
   },
   "dependencies": {
     "@react-three/fiber": "^9.7.0",
+    "qrcode": "^1.5.4",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "three": "^0.186.0"
   },
   "devDependencies": {
     "@types/node": "^26.5.1",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@types/three": "^0.186.0",
     "@vitejs/plugin-react": "^6.1.1",
     "iwer": "^2.4.0",
+    "jsqr": "^1.4.0",
     "playwright": "^1.63.0",
     "prettier": "^3.9.6",
     "typescript": "^7.0.2",

@@ -27,6 +27,15 @@ import { AircraftInfo } from "./AircraftInfo";
 import { EvolutionControls } from "./EvolutionControls";
 import { FlightMap } from "./FlightMap";
 import { VrRuntime } from "./vr";
+import { SkyTransfer } from "./SkyTransfer";
+import {
+  applySky,
+  captureSky,
+  parseSky,
+  skyOptions,
+  SKY_OPTIONS_KEY,
+  type SkyRecipe,
+} from "./sky-transfer";
 
 function Icon({
   name,
@@ -117,6 +126,22 @@ function loadExperience() {
   } catch {
     /* Aircraft and route recover independently. */
   }
+  try {
+    const raw = localStorage.getItem(SKY_OPTIONS_KEY);
+    if (raw)
+      applySky(
+        e,
+        parseSky({
+          ...captureSky(e),
+          ...JSON.parse(raw),
+          route: e.spec,
+          aircraft: e.aircraftDesign,
+        }),
+        false,
+      );
+  } catch {
+    /* Legacy route and aircraft remain usable if optional settings are invalid. */
+  }
   return e;
 }
 
@@ -132,8 +157,22 @@ export function App() {
   const [outputProfile, setOutputProfile] = useState<OutputProfile>(
     audio.outputProfile,
   );
-  const [delay, setDelay] = useState(1.6);
-  const [observer, setObserver] = useState<string>("garden");
+  const [delay, setDelay] = useState(e.recipe.delayScale);
+  const [observer, setObserver] = useState<string>(
+    () =>
+      OBSERVERS.find((o) => distance(o.position, e.listener) < 1)?.id ??
+      "garden",
+  );
+  const [transfer, setTransfer] = useState<{ code?: string } | null>(null);
+  useEffect(() => {
+    const receive = () => {
+      if (location.hash.startsWith("#sky="))
+        setTransfer({ code: location.hash.slice(5) });
+    };
+    receive();
+    window.addEventListener("hashchange", receive);
+    return () => window.removeEventListener("hashchange", receive);
+  }, []);
   const [reduced, setReduced] = useState(
     () => matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
@@ -180,6 +219,55 @@ export function App() {
       );
     }
   }, [e, notifyMessage]);
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        SKY_OPTIONS_KEY,
+        JSON.stringify({
+          version: 1,
+          airspace: e.airspace,
+          evolution: e.evolution,
+          delayScale: delay,
+          observer,
+        }),
+      );
+    } catch {
+      /* Optional storage: importing and playing still work for this visit. */
+    }
+  }, [
+    e,
+    snapshot.airspace.aircraftCount,
+    snapshot.airspace.spacingSec,
+    snapshot.evolution.enabled,
+    snapshot.evolution.amount,
+    delay,
+    observer,
+  ]);
+  function closeTransfer() {
+    setTransfer(null);
+    if (location.hash.startsWith("#sky="))
+      history.replaceState(null, "", location.pathname + location.search);
+  }
+  function importSky(sky: SkyRecipe) {
+    applySky(e, sky);
+    setDelay(sky.delayScale);
+    setObserver(sky.observer);
+    setInspectedId(null);
+    setWorkshop(false);
+    view.current = { yaw: 0, pitch: 0.32, zoom: false };
+    setZoom(false);
+    closeTransfer();
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(e.spec));
+      localStorage.setItem(AIRCRAFT_KEY, JSON.stringify(e.aircraftDesign));
+      localStorage.setItem(SKY_OPTIONS_KEY, JSON.stringify(skyOptions(sky)));
+      notifyMessage(
+        "この空を取り込みました。飛ばすか、VRで空に立ってみましょう。",
+      );
+    } catch {
+      notifyMessage("この空を取り込みました。端末への保存はできませんでした。");
+    }
+  }
 
   async function enableAudio() {
     try {
@@ -285,7 +373,7 @@ export function App() {
       [
         JSON.stringify(
           {
-            version: "0.5.2",
+            version: "0.6.0",
             platform: vr.diagnostics.frames > 0 ? "webxr-standalone" : "web",
             route: e.spec,
             aircraftDesign: e.aircraftDesign,
@@ -421,7 +509,7 @@ export function App() {
   }, [e, audio, vr]);
   useEffect(() => {
     function key(event: KeyboardEvent) {
-      if (vr.active) return;
+      if (vr.active || transfer) return;
       if (event.key === "Escape" && inspectedId && !help) {
         event.preventDefault();
         setInspectedId(null);
@@ -519,6 +607,14 @@ export function App() {
             )}
             <AirspaceControls experience={e} />
             <EvolutionControls experience={e} />
+            {editing && (
+              <button
+                className="transfer-open secondary"
+                onClick={() => setTransfer({})}
+              >
+                この空をQuestへ渡す
+              </button>
+            )}
             <section className="vr-entry" aria-label="QuestでのVR体験">
               <button
                 id="vr-enter"
@@ -747,6 +843,7 @@ export function App() {
               reduced={reduced}
               selectedId={inspectedId}
               onSelect={setInspectedId}
+              onClear={clearSelection}
             />
             <div className="sky-top">
               <span className="sky-label">
@@ -898,8 +995,18 @@ export function App() {
         >
           音・表示の設定 <span>{diagnostics ? "−" : "+"}</span>
         </button>
-        <span className="version">WORKSHOP · v0.5.2</span>
+        <span className="version">WORKSHOP · v0.6.0</span>
       </footer>
+      {transfer && (
+        <SkyTransfer
+          experience={e}
+          delay={delay}
+          observer={observer}
+          code={transfer.code}
+          onApply={importSky}
+          onClose={closeTransfer}
+        />
+      )}
       {diagnostics && (
         <section className="settings" aria-label="音と表示の設定">
           <div>

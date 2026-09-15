@@ -57,9 +57,15 @@ try {
             side: THREE.DoubleSide,
             toneMapped: false,
           }),
+          true,
         ),
         1,
       );
+      const ringFade = new THREE.InstancedBufferAttribute(
+        new Float32Array([1]),
+        1,
+      );
+      ring.geometry.setAttribute("trailFade", ringFade);
       ring.setMatrixAt(0, new THREE.Matrix4().makeTranslation(-1, 0, -5));
       ring.visible = false;
       scene.add(line, ring);
@@ -113,6 +119,10 @@ try {
       mask.aircraft.value[0].set(0, 0, -10, 0);
       render();
       const removedAircraft = peak(256);
+      mask.aircraft.value[0].set(0, 0, -1000, 1.32);
+      render();
+      const farAircraftMargin = [peak(258), peak(275)];
+      mask.aircraft.value[0].set(0, 0, -10, 0);
       line.visible = false;
       ring.visible = true;
       render();
@@ -121,6 +131,34 @@ try {
       render();
       const ringAfter = [peak(256), peak(154)];
       snapshot("Sound ripple: only the overlapping arc fades");
+      // Aging must reveal the background, not leave a darker opaque stain.
+      mask.aircraft.value[0].w = 0;
+      renderer.setClearColor(0x808080);
+      const aging = [];
+      for (const age of [0, 0.5, 1]) {
+        ringFade.setX(0, Math.pow(1 - age, 1.6));
+        ringFade.needsUpdate = true;
+        render();
+        aging.push(peak(154));
+      }
+      ring.visible = false;
+      line.visible = true;
+      const rgba = new THREE.Float32BufferAttribute(
+        [1, 1, 1, 0, 1, 1, 1, 0],
+        4,
+      );
+      line.geometry.setAttribute("color", rgba);
+      line.material.vertexColors = true;
+      line.material.needsUpdate = true;
+      const lineAging = [];
+      for (const age of [0, 0.5, 1]) {
+        const alpha = Math.pow(1 - age, 1.6);
+        rgba.setW(0, alpha);
+        rgba.setW(1, alpha);
+        rgba.needsUpdate = true;
+        render();
+        lineAging.push(peak(350));
+      }
       document.body.replaceChildren();
       document.body.style.cssText =
         "margin:0;background:#eef1e8;font:16px sans-serif;display:flex;flex-wrap:wrap";
@@ -151,6 +189,9 @@ try {
         removedAircraft,
         ringBefore,
         ringAfter,
+        farAircraftMargin,
+        aging,
+        lineAging,
       };
     },
     `/@fs/${path.resolve("node_modules/three/build/three.module.js").replaceAll("\\", "/")}`,
@@ -170,6 +211,12 @@ try {
   assert(result.behindViewer > 250 && result.removedAircraft > 250);
   assert(result.ringBefore.every((n) => n > 250));
   assert(result.ringAfter[0] < 3 && result.ringAfter[1] > 250);
+  assert(result.farAircraftMargin[0] < 3 && result.farAircraftMargin[1] > 250);
+  for (const values of [result.aging, result.lineAging]) {
+    assert(values[0] > 250);
+    assert(values[1] > values[2] + 10 && values[1] < values[0] - 10);
+    assert(values[2] > 45 && values[2] < 140); // actual background in linear render target
+  }
   assert.deepEqual(errors, []);
   await page.screenshot({ path: `${out}/comparison.png`, fullPage: true });
   await fs.writeFile(

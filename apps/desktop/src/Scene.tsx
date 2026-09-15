@@ -35,6 +35,7 @@ interface SceneProps {
   reduced: boolean;
   selectedId: FlightId | null;
   onSelect: (id: FlightId) => void;
+  onClear: () => void;
 }
 const UP = new THREE.Vector3(0, 1, 0);
 const Z = new THREE.Vector3(0, 0, 1);
@@ -145,9 +146,17 @@ function World({
     );
     g.setAttribute(
       "color",
-      new THREE.BufferAttribute(new Float32Array(384 * 2 * 3), 3),
+      new THREE.BufferAttribute(new Float32Array(384 * 2 * 4), 4),
     );
     g.setDrawRange(0, 0);
+    return g;
+  }, []);
+  const ringGeometry = useMemo(() => {
+    const g = new THREE.RingGeometry(0.94, 1, 48);
+    g.setAttribute(
+      "trailFade",
+      new THREE.InstancedBufferAttribute(new Float32Array(8), 1),
+    );
     return g;
   }, []);
   const designMaterial = useMemo(
@@ -179,10 +188,11 @@ function World({
         new THREE.MeshBasicMaterial({
           color: "#d9f6f7",
           transparent: true,
-          opacity: 0.17,
+          opacity: 0.08,
           depthWrite: false,
           side: THREE.DoubleSide,
         }),
+        true,
       ),
     [trailVisibility],
   );
@@ -215,8 +225,16 @@ function World({
       designMaterial.dispose();
       trailMaterial.dispose();
       ringMaterial.dispose();
+      ringGeometry.dispose();
     },
-    [geometry, trailGeometry, designMaterial, trailMaterial, ringMaterial],
+    [
+      geometry,
+      trailGeometry,
+      designMaterial,
+      trailMaterial,
+      ringMaterial,
+      ringGeometry,
+    ],
   );
   useFrame((_, dt, frame) => {
     const immersive = vr.update(frame, dt);
@@ -331,24 +349,25 @@ function World({
           0,
           1 - (e.nowMs - b.arrivalAtMs) / (e.recipe.trailPersistenceSec * 1000),
         ),
-        0.7,
+        1.6,
       );
       position.setXYZ(count, a.position.x, a.position.y, a.position.z);
       position.setXYZ(count + 1, b.position.x, b.position.y, b.position.z);
-      color.setXYZ(count, fade * 0.72, fade * 0.95, fade);
-      color.setXYZ(count + 1, fade * 0.72, fade * 0.95, fade);
+      color.setXYZW(count, 0.72, 0.95, 1, fade);
+      color.setXYZW(count + 1, 0.72, 0.95, 1, fade);
       count += 2;
     }
     trailGeometry.setDrawRange(0, count);
     position.needsUpdate = true;
     color.needsUpdate = true;
     trailObject.frustumCulled = false;
-    trailMaterial.opacity = reduced ? 0.18 : 0.55;
+    trailMaterial.opacity = e.recipe.trailOpacity * (reduced ? 0.2 : 0.65);
     if (rings.current) {
       const recent = e.trails
         .filter((p) => p.emissionId % 8 === 0 && e.nowMs - p.arrivalAtMs < 1800)
         .slice(-8);
       rings.current.count = reduced ? 0 : recent.length;
+      const ringFade = ringGeometry.getAttribute("trailFade");
       recent.forEach((p, i) => {
         const age = (e.nowMs - p.arrivalAtMs) / 1800;
         temp.dummy.position.set(p.position.x, p.position.y, p.position.z);
@@ -356,14 +375,10 @@ function World({
         temp.dummy.scale.setScalar(10 + age * 28);
         temp.dummy.updateMatrix();
         rings.current!.setMatrixAt(i, temp.dummy.matrix);
-        rings.current!.setColorAt(
-          i,
-          new THREE.Color().setRGB(0.55 + age * 0.05, 0.8, 0.9),
-        );
+        ringFade.setX(i, Math.pow(Math.max(0, 1 - age), 1.6));
       });
       rings.current.instanceMatrix.needsUpdate = true;
-      if (rings.current.instanceColor)
-        rings.current.instanceColor.needsUpdate = true;
+      ringFade.needsUpdate = true;
     }
     window.__soundTrailRender = {
       calls: gl.info.render.calls,
@@ -400,9 +415,8 @@ function World({
         args={[undefined, undefined, 8]}
         frustumCulled={false}
         material={ringMaterial}
-      >
-        <ringGeometry args={[0.94, 1, 48]} />
-      </instancedMesh>
+        geometry={ringGeometry}
+      />
     </>
   );
 }
@@ -495,6 +509,7 @@ export function Scene(props: SceneProps) {
             event.pointerType === "touch",
           );
           if (id) props.onSelect(id);
+          else props.onClear();
         }
         drag.current = null;
         if (event.currentTarget.hasPointerCapture(event.pointerId))

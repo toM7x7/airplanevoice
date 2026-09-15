@@ -118,7 +118,8 @@ try {
   await page.waitForFunction(() => typeof window.advanceTime === "function");
   await step(0);
   assert.equal((await state()).checksum, chosen);
-  assert.equal((await state()).evolution.enabled, false);
+  assert.equal((await state()).evolution.enabled, true);
+  assert.equal((await state()).phase, "EDIT");
   await reset();
   await enabled().check();
   await page.locator("#start-btn").click();

@@ -192,12 +192,50 @@ try {
     .focus();
   await page.keyboard.press("Enter");
   assert.equal((await state()).inspection.id, "ST-01");
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await step(0);
+  const skyRect = await page.locator("canvas").boundingBox();
+  const empty = {
+    x: skyRect.x + skyRect.width * 0.5,
+    y: skyRect.y + skyRect.height * 0.15,
+  };
+  assert(
+    await page.evaluate(
+      ({ x, y }) =>
+        document.elementFromPoint(x, y) instanceof HTMLCanvasElement,
+      empty,
+    ),
+  );
+  // Dragging and cancelling a pointer are not empty-space clicks.
+  await page.mouse.move(empty.x, empty.y);
+  await page.mouse.down();
+  await page.mouse.move(empty.x - 80, empty.y + 20, { steps: 4 });
+  await page.mouse.up();
+  assert.equal((await state()).inspection.id, "ST-01");
+  await page.locator("canvas").evaluate((canvas) =>
+    canvas.addEventListener(
+      "pointerdown",
+      (event) => {
+        window.testPointerId = event.pointerId;
+      },
+      { once: true },
+    ),
+  );
+  await page.mouse.move(empty.x, empty.y);
+  await page.mouse.down();
+  const pointerId = await page.evaluate(() => window.testPointerId);
+  await page.locator("canvas").dispatchEvent("pointercancel", { pointerId });
+  await page.mouse.up();
+  assert.equal((await state()).inspection.id, "ST-01");
+  await page.mouse.click(empty.x, empty.y);
+  assert.equal((await state()).inspection, null);
+  assert.equal((await state()).mixMode, "balanced");
   assert.deepEqual(errors, []);
   await fs.writeFile(
     `${out}/result.json`,
-    JSON.stringify({ passed: true, scenarios: 13, errors }, null, 2),
+    JSON.stringify({ passed: true, scenarios: 15, errors }, null, 2),
   );
-  console.log("Observation browser checks passed: 13 scenarios");
+  console.log("Observation browser checks passed: 15 scenarios");
 } finally {
   await page.screenshot({ path: `${out}/last-screen.png`, fullPage: true });
   await fs.writeFile(
