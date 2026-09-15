@@ -79,6 +79,8 @@ PC上の `http://127.0.0.1:4173/` で配布版を確認する。`dist`を保持�
 
 共有データはURL fragmentに含み、新しいサーバー・DB・認証を追加していない。設定保存は端末内、同期時刻や共有部屋は後続。[受け渡し手順](sky-transfer.md)。
 
+修正コミット`559a590`は[公開処理](https://github.com/toM7x7/airplanevoice/actions/runs/34951925577)・[CI](https://github.com/toM7x7/airplanevoice/actions/runs/34951925564)が成功。修正後の公開受け渡し12項目が全て合格し、`output/transfer-public-v060-fixed`に保存した。実際のXRQRサイトからも合成カメラによる読取→URL全文コピー→公開ページを開く→明示取り込みが合格。物理Questのカメラ許可と読取性能は未確認。
+
 `npm run test:offline` は配布版に対し、初回保存→ネット遮断→再読み込み→保存した機体の復元→飛行と音出力→接続復帰を確認する。公開URLでも環境変数`SOUND_TRAIL_URL`で同じ確認ができる。
 
 技術参照: [GitHub PagesのActions公開](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)、[Service Workerの保存と更新](https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API/Using_Service_Workers)。
