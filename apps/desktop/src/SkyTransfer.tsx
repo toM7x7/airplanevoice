@@ -54,7 +54,7 @@ export function SkyTransfer({
         if (receiving) return;
         const base = import.meta.env.DEV
           ? "https://tom7x7.github.io/airplanevoice/"
-          : new URL(import.meta.env.BASE_URL, location.origin).href;
+          : new URL(import.meta.env.BASE_URL, location.href).href;
         const link = `${base}#sky=${await encodeSky(data)}`;
         if (!active) return;
         setUrl(link);

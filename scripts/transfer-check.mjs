@@ -11,6 +11,7 @@ const browser = await chromium.launch({
 });
 const errors = [],
   checks = [];
+let development = false;
 const record = (name) => {
   checks.push(name);
   console.log(`OK ${name}`);
@@ -23,7 +24,16 @@ const button = (page, name) => page.getByRole("button", { name, exact: true });
 const share = async (page) => {
   await button(page, "この空をQuestへ渡す").click();
   await page.getByLabel("渡すURL", { exact: true }).waitFor();
-  return page.getByLabel("渡すURL", { exact: true }).inputValue();
+  const link = await page.getByLabel("渡すURL", { exact: true }).inputValue();
+  const expectedBase = development
+    ? "https://tom7x7.github.io/airplanevoice/"
+    : new URL("./", page.url()).href;
+  assert.equal(
+    link.split("#")[0],
+    expectedBase,
+    "The generated URL must preserve the deployed subdirectory",
+  );
+  return link;
 };
 const watch = (page) => {
   page.on("pageerror", (e) => errors.push(e.message));
@@ -31,7 +41,10 @@ const watch = (page) => {
     if (m.type() === "error") errors.push(m.text());
   });
 };
-const localLink = (link) => url.replace(/#.*$/, "") + new URL(link).hash;
+// Only the development server redirects public links back to localhost.
+// Production tests must open the actual generated URL without repairing it.
+const localLink = (link) =>
+  development ? url.replace(/#.*$/, "") + new URL(link).hash : link;
 const storage = (page) => page.evaluate(() => ({ ...localStorage }));
 const sameSky = (a, b) => {
   for (const key of [
@@ -56,6 +69,9 @@ try {
   watch(pc);
   await pc.goto(url);
   await ready(pc);
+  development = await pc.evaluate(
+    () => typeof window.advanceTime === "function",
+  );
   if (await pc.evaluate(() => typeof window.advanceTime === "undefined")) {
     await pc.waitForFunction(
       () =>

@@ -71,6 +71,14 @@ PC上の `http://127.0.0.1:4173/` で配布版を確認する。`dist`を保持�
 
 ## 検証
 
+### v0.6.0 — PCからQuestへの設定受け渡し
+
+2026-09-15、アプリのコミット`4f6f88b`を公開。[公開処理](https://github.com/toM7x7/airplanevoice/actions/runs/34951543950)と[CI](https://github.com/toM7x7/airplanevoice/actions/runs/34951544082)が成功した。
+
+公開URLのVR模擬20項目が合格。受け渡し12項目の先行試験は受信URLのパスを補っていたため、後続のXRQR通し確認で公開パスの欠落を発見した。相対baseを現在のページURLから解決する修正と、生成URLをそのまま開く検証へ変更した。初回QR生成を通信遮断後に行う検証、別ブラウザでの取消・保存・飛行中拒否などを修正後に再確認する。
+
+共有データはURL fragmentに含み、新しいサーバー・DB・認証を追加していない。設定保存は端末内、同期時刻や共有部屋は後続。[受け渡し手順](sky-transfer.md)。
+
 `npm run test:offline` は配布版に対し、初回保存→ネット遮断→再読み込み→保存した機体の復元→飛行と音出力→接続復帰を確認する。公開URLでも環境変数`SOUND_TRAIL_URL`で同じ確認ができる。
 
 技術参照: [GitHub PagesのActions公開](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)、[Service Workerの保存と更新](https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API/Using_Service_Workers)。
