@@ -20,6 +20,7 @@ type Action =
   | "profile"
   | "quieter"
   | "louder"
+  | "clear"
   | FlightId;
 const BUTTONS: {
   x: number;
@@ -39,6 +40,7 @@ const BUTTONS: {
   })),
   { x: 724, y: 426, w: 270, h: 60, action: "exit" },
   { x: 30, y: 426, w: 270, h: 60, action: "settings" },
+  { x: 330, y: 426, w: 360, h: 60, action: "clear" },
 ];
 const AUDIO_BUTTONS: typeof BUTTONS = [
   { x: 30, y: 205, w: 470, h: 78, action: "all" },
@@ -48,6 +50,7 @@ const AUDIO_BUTTONS: typeof BUTTONS = [
   { x: 774, y: 315, w: 220, h: 62, action: "louder" },
   { x: 30, y: 426, w: 270, h: 60, action: "back" },
   { x: 724, y: 426, w: 270, h: 60, action: "exit" },
+  { x: 330, y: 426, w: 360, h: 60, action: "clear" },
 ];
 
 /** Single-user, stationary observation. Metres and the original audio clock stay shared. */
@@ -101,6 +104,7 @@ export class VrRuntime {
   onVolume = (_delta: number) => {};
   onProfile = () => {};
   onSelect = (_id: FlightId) => {};
+  onClear = () => {};
 
   constructor(
     private experience: Experience,
@@ -394,9 +398,12 @@ export class VrRuntime {
     else if (action === "settings" || action === "back")
       this.audioPage = action === "settings";
     else if (action === "all") this.experience.setMix("balanced");
-    else if (action === "focus")
-      this.experience.setMix("focus", this.selected ?? this.experience.focusId);
-    else if (action === "profile") this.onProfile();
+    else if (action === "focus") {
+      if (this.selected) this.experience.setMix("focus", this.selected);
+    } else if (action === "clear") {
+      this.selected = null;
+      this.onClear();
+    } else if (action === "profile") this.onProfile();
     else if (action === "quieter") this.onVolume(-5);
     else if (action === "louder") this.onVolume(5);
     else if (this.experience.flightIds.includes(action)) {
@@ -516,7 +523,13 @@ export class VrRuntime {
     ctx.fillText(this.audioPage ? mixLabel : detail, 30, 152);
     for (const b of this.audioPage ? AUDIO_BUTTONS : BUTTONS) {
       const isPlane = b.action.startsWith("ST-");
-      const enabled = !isPlane || e.flightIds.includes(b.action as FlightId);
+      const enabled = isPlane
+        ? e.flightIds.includes(b.action as FlightId)
+        : b.action === "focus"
+          ? selected !== null
+          : b.action === "clear"
+            ? selected !== null || e.mixMode !== "balanced"
+            : true;
       ctx.fillStyle = !enabled
         ? "#1c373a"
         : b.action === selected
@@ -547,17 +560,21 @@ export class VrRuntime {
                   ? "空の操作へ"
                   : b.action === "all"
                     ? "空全体を聴く"
-                    : b.action === "focus"
-                      ? `${selected ?? e.focusId}を強めに聴く`
-                      : b.action === "profile"
-                        ? this.audio.outputProfile === "speaker"
-                          ? "ヘッドホン向けに切替"
-                          : "本体スピーカー向けに切替"
-                        : b.action === "quieter"
-                          ? "音量 −5"
-                          : b.action === "louder"
-                            ? "音量 ＋5"
-                            : b.action;
+                    : b.action === "clear"
+                      ? "選択を外す"
+                      : b.action === "focus"
+                        ? selected
+                          ? `${selected}を強めに聴く`
+                          : "機体を選ぶと強調できます"
+                        : b.action === "profile"
+                          ? this.audio.outputProfile === "speaker"
+                            ? "ヘッドホン向けに切替"
+                            : "本体スピーカー向けに切替"
+                          : b.action === "quieter"
+                            ? "音量 −5"
+                            : b.action === "louder"
+                              ? "音量 ＋5"
+                              : b.action;
       ctx.fillText(label, b.x + 22, b.y + b.h / 2 + 10);
       if (isPlane && enabled) {
         const db = this.audio.levels.flights[b.action as FlightId]?.db ?? -120;
@@ -586,7 +603,11 @@ export class VrRuntime {
       410,
     );
     ctx.font = "18px sans-serif";
-    ctx.fillText("グリップ：操作盤を呼ぶ", 318, 460);
+    ctx.fillText(
+      "グリップ：操作盤を呼ぶ  /  選択を外すと空全体の音へ",
+      30,
+      507,
+    );
     this.panel.material.map!.needsUpdate = true;
   }
 
@@ -616,6 +637,7 @@ export class VrRuntime {
         ? { matrix: panel.matrixWorld.toArray(), width: 2.4, height: 1.2 }
         : null,
       selected: this.selected,
+      selectionMarkerVisible: this.marker?.visible ?? false,
       soundOn: this.soundOn,
       audioPage: this.audioPage,
     };

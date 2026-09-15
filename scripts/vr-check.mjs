@@ -58,13 +58,10 @@ try {
     page.waitForFunction(predicate, arg, { timeout });
   const frames = async (count = 2) => {
     const target = (await state()).vr.frames + count;
-    await wait(
-      (target) => {
-        const { vr } = JSON.parse(window.render_game_to_text());
-        return vr.status !== "presenting" || vr.frames >= target;
-      },
-      target,
-    );
+    await wait((target) => {
+      const { vr } = JSON.parse(window.render_game_to_text());
+      return vr.status !== "presenting" || vr.frames >= target;
+    }, target);
   };
   const press = async (id = "trigger") => {
     await page.evaluate(
@@ -347,6 +344,24 @@ try {
   assert.equal((await state()).mixMode, "balanced");
   assert.equal((await state()).checksum, routeBeforeSound);
   await page.screenshot({ path: `${out}/06-vr-sound-settings.png` });
+  await button(750, 243);
+  assert.equal((await state()).focusId, "ST-03");
+  const beforeClear = await state();
+  await button(500, 453);
+  s = await state();
+  assert.equal(s.inspection, null);
+  assert.equal(s.vr.selected, null);
+  assert.equal(s.vr.selectionMarkerVisible, false);
+  assert.equal(s.mixMode, "balanced");
+  assert.equal(s.checksum, beforeClear.checksum);
+  assert(s.elapsedMs >= beforeClear.elapsedMs);
+  assert.equal(s.paused, false);
+  await button(750, 243);
+  assert.equal((await state()).mixMode, "balanced");
+  await page.screenshot({ path: `${out}/07-cleared-sound-settings.png` });
+  record(
+    "Clear selection removes information and marker, restores all-plane sound and disables stale focus",
+  );
   await button(150, 453);
   assert.equal((await state()).vr.audioPage, false);
   record(
@@ -355,6 +370,24 @@ try {
   await page.screenshot({ path: `${out}/05-three-aircraft.png` });
   record(
     "Three aircraft sound independently; ray switches selection; hill origin remains in metres",
+  );
+  await button(500, 350);
+  assert.equal((await state()).inspection.id, "ST-02");
+  await button(250, 243);
+  const pausedBeforeClear = await state();
+  assert(pausedBeforeClear.paused);
+  await button(500, 453);
+  s = await state();
+  assert.equal(s.inspection, null);
+  assert.equal(s.vr.selectionMarkerVisible, false);
+  assert.equal(s.elapsedMs, pausedBeforeClear.elapsedMs);
+  assert.equal(s.checksum, pausedBeforeClear.checksum);
+  assert.equal(s.mixMode, "balanced");
+  assert(s.paused);
+  await page.screenshot({ path: `${out}/08-cleared-main-panel.png` });
+  await button(250, 243);
+  record(
+    "Main-panel clear also works after re-selection and preserves paused flight",
   );
   if (await page.evaluate(() => typeof window.advanceTime === "function")) {
     const beforeLap = s.lap;

@@ -9,12 +9,14 @@ export function AircraftInfo({
   ids,
   onSelect,
   onClose,
+  onClear,
   onLook,
 }: {
   info: Info;
   ids: FlightId[];
   onSelect: (id: FlightId) => void;
   onClose: () => void;
+  onClear: () => void;
   onLook: () => void;
 }) {
   const status = info.paused
@@ -116,6 +118,9 @@ export function AircraftInfo({
               : "この機体の飛行は終わりました。次の周回でまた観察できます。"}
         </p>
       )}
+      <button className="info-look info-clear" onClick={onClear}>
+        選択を外して空全体を聴く
+      </button>
     </section>
   );
 }

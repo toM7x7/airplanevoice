@@ -11,6 +11,7 @@ import {
 import { Aircraft } from "./Aircraft";
 import type { AircraftAudio } from "./audio";
 import type { VrRuntime } from "./vr";
+import { TrailVisibility } from "./trail-visibility";
 
 export interface ViewState {
   yaw: number;
@@ -135,6 +136,7 @@ function World({
   const { camera, gl, size, scene } = useThree();
   useEffect(() => vr.attach(gl, camera, scene), [vr, gl, camera, scene]);
   const geometry = useMemo(() => new THREE.BufferGeometry(), []);
+  const trailVisibility = useMemo(() => new TrailVisibility(), []);
   const trailGeometry = useMemo(() => {
     const g = new THREE.BufferGeometry();
     g.setAttribute(
@@ -161,13 +163,28 @@ function World({
   );
   const trailMaterial = useMemo(
     () =>
-      new THREE.LineBasicMaterial({
-        vertexColors: true,
-        transparent: true,
-        opacity: 0.55,
-        depthWrite: false,
-      }),
-    [],
+      trailVisibility.apply(
+        new THREE.LineBasicMaterial({
+          vertexColors: true,
+          transparent: true,
+          opacity: 0.55,
+          depthWrite: false,
+        }),
+      ),
+    [trailVisibility],
+  );
+  const ringMaterial = useMemo(
+    () =>
+      trailVisibility.apply(
+        new THREE.MeshBasicMaterial({
+          color: "#d9f6f7",
+          transparent: true,
+          opacity: 0.17,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        }),
+      ),
+    [trailVisibility],
   );
   const lineObject = useMemo(
     () => new THREE.LineLoop(geometry, designMaterial),
@@ -197,8 +214,9 @@ function World({
       trailGeometry.dispose();
       designMaterial.dispose();
       trailMaterial.dispose();
+      ringMaterial.dispose();
     },
-    [geometry, trailGeometry, designMaterial, trailMaterial],
+    [geometry, trailGeometry, designMaterial, trailMaterial, ringMaterial],
   );
   useFrame((_, dt, frame) => {
     const immersive = vr.update(frame, dt);
@@ -221,6 +239,8 @@ function World({
     vr.draw(selectedId, soundOn);
     const visibleTargets: AircraftTarget[] = [];
     aircraft.current.forEach((mesh, index) => {
+      const clearance = trailVisibility.aircraft.value[index];
+      clearance.set(0, 0, 0, 0);
       if (!mesh) return;
       const f = e.flights[index];
       mesh.visible =
@@ -228,6 +248,13 @@ function World({
       if (!mesh.visible) return;
       const pose = e.pose(AIRCRAFT[index].id);
       mesh.position.set(pose.position.x, pose.position.y, pose.position.z);
+      clearance.set(
+        mesh.position.x,
+        mesh.position.y,
+        mesh.position.z,
+        Math.max(e.aircraftDesign.bodyLengthM, e.aircraftDesign.wingSpanM) *
+          0.6,
+      );
       temp.tangent.set(pose.tangent.x, pose.tangent.y, pose.tangent.z);
       temp.right.crossVectors(UP, temp.tangent).normalize();
       temp.up.crossVectors(temp.tangent, temp.right).normalize();
@@ -372,15 +399,9 @@ function World({
         ref={rings}
         args={[undefined, undefined, 8]}
         frustumCulled={false}
+        material={ringMaterial}
       >
         <ringGeometry args={[0.94, 1, 48]} />
-        <meshBasicMaterial
-          color="#d9f6f7"
-          transparent
-          opacity={0.17}
-          depthWrite={false}
-          side={THREE.DoubleSide}
-        />
       </instancedMesh>
     </>
   );

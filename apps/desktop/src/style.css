@@ -220,6 +220,11 @@
   line-height: 1.9;
   margin: 18px 0 8px;
 }
+.info-clear {
+  border-top: 1px solid #d9e1d6;
+  margin-top: 6px;
+  min-height: 40px;
+}
 @media (max-width: 760px) {
   .sky-stage {
     position: relative;

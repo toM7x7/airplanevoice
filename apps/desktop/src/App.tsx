@@ -239,6 +239,11 @@ export function App() {
     void sound();
   };
   vr.onSelect = setInspectedId;
+  function clearSelection() {
+    setInspectedId(null);
+    e.setMix("balanced");
+  }
+  vr.onClear = clearSelection;
   function changeVolume(value: number) {
     const next = Math.max(0, Math.min(70, value));
     setVolume(next);
@@ -280,7 +285,7 @@ export function App() {
       [
         JSON.stringify(
           {
-            version: "0.5.1",
+            version: "0.5.2",
             platform: vr.diagnostics.frames > 0 ? "webxr-standalone" : "web",
             route: e.spec,
             aircraftDesign: e.aircraftDesign,
@@ -879,6 +884,7 @@ export function App() {
               ids={e.flightIds}
               onSelect={setInspectedId}
               onClose={() => setInspectedId(null)}
+              onClear={clearSelection}
               onLook={() => lookAtAircraft(inspection.id)}
             />
           )}
@@ -892,7 +898,7 @@ export function App() {
         >
           音・表示の設定 <span>{diagnostics ? "−" : "+"}</span>
         </button>
-        <span className="version">WORKSHOP · v0.5.1</span>
+        <span className="version">WORKSHOP · v0.5.2</span>
       </footer>
       {diagnostics && (
         <section className="settings" aria-label="音と表示の設定">

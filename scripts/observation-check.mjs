@@ -167,7 +167,16 @@ try {
   const box = await panel.boundingBox();
   assert(box.x >= 0 && box.x + box.width <= 390);
   await page.screenshot({ path: `${out}/03-mobile.png`, fullPage: true });
-  await close();
+  const beforeClear = await state();
+  await page
+    .getByRole("button", { name: "選択を外して空全体を聴く", exact: true })
+    .click();
+  s = await state();
+  assert.equal(s.inspection, null);
+  assert.equal(s.mixMode, "balanced");
+  assert.equal(s.checksum, beforeClear.checksum);
+  assert.equal(s.elapsedMs, beforeClear.elapsedMs);
+  assert.equal(await page.locator(".aircraft-marker").isVisible(), false);
   // Keyboard access through the visible information button.
   await page
     .getByRole("button", { name: "機体情報を表示", exact: true })
@@ -177,9 +186,9 @@ try {
   assert.deepEqual(errors, []);
   await fs.writeFile(
     `${out}/result.json`,
-    JSON.stringify({ passed: true, scenarios: 12, errors }, null, 2),
+    JSON.stringify({ passed: true, scenarios: 13, errors }, null, 2),
   );
-  console.log("Observation browser checks passed: 12 scenarios");
+  console.log("Observation browser checks passed: 13 scenarios");
 } finally {
   await page.screenshot({ path: `${out}/last-screen.png`, fullPage: true });
   await fs.writeFile(
