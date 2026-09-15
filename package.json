@@ -1,6 +1,6 @@
 {
   "name": "sound-trail",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "private": true,
   "type": "module",
   "engines": {
@@ -19,7 +19,8 @@
     "test:observation": "node scripts/observation-check.mjs",
     "test:evolution": "node scripts/evolution-check.mjs",
     "test:offline": "node scripts/offline-check.mjs",
-    "test:vr": "node scripts/vr-check.mjs"
+    "test:vr": "node scripts/vr-check.mjs",
+    "test:audio": "node scripts/audio-output-check.mjs"
   },
   "dependencies": {
     "@react-three/fiber": "^9.7.0",

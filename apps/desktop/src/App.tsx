@@ -18,7 +18,7 @@ import {
   aircraftInfo,
   type FlightId,
 } from "../../../packages/core/src";
-import { AircraftAudio } from "./audio";
+import { AircraftAudio, type OutputProfile } from "./audio";
 import { Scene, type ViewState } from "./Scene";
 import { RouteEditor } from "./RouteEditor";
 import { AirspaceControls } from "./AirspaceControls";
@@ -129,6 +129,9 @@ export function App() {
   const [muted, setMuted] = useState(false);
   const [audioReady, setAudioReady] = useState(false);
   const [volume, setVolume] = useState(35);
+  const [outputProfile, setOutputProfile] = useState<OutputProfile>(
+    audio.outputProfile,
+  );
   const [delay, setDelay] = useState(1.6);
   const [observer, setObserver] = useState<string>("garden");
   const [reduced, setReduced] = useState(
@@ -236,6 +239,18 @@ export function App() {
     void sound();
   };
   vr.onSelect = setInspectedId;
+  function changeVolume(value: number) {
+    const next = Math.max(0, Math.min(70, value));
+    setVolume(next);
+    audio.setVolume(next / 100);
+  }
+  function changeProfile(value: OutputProfile) {
+    setOutputProfile(value);
+    audio.setOutputProfile(value);
+  }
+  vr.onVolume = (delta) => changeVolume(volume + delta);
+  vr.onProfile = () =>
+    changeProfile(outputProfile === "speaker" ? "headphones" : "speaker");
   function enterVr() {
     void vr.enter();
     void enableAudio();
@@ -265,8 +280,8 @@ export function App() {
       [
         JSON.stringify(
           {
-            version: "0.5.0",
-            platform: "desktop-local",
+            version: "0.5.1",
+            platform: vr.diagnostics.frames > 0 ? "webxr-standalone" : "web",
             route: e.spec,
             aircraftDesign: e.aircraftDesign,
             recipe: e.recipe,
@@ -278,9 +293,14 @@ export function App() {
             },
             tower: { enabled: e.tower.enabled, provider: "local-rules" },
             audio: {
+              state: audio.context?.state ?? "locked",
+              activeByFlight: audio.activeByFlight,
               played: audio.played,
               skipped: audio.skipped,
               playedByFlight: audio.playedByFlight,
+              outputProfile: audio.outputProfile,
+              volume: audio.volumeLevel,
+              levels: audio.levels,
             },
             events: e.logs,
             vr: vr.diagnostics,
@@ -351,6 +371,10 @@ export function App() {
           played: audio.played,
           skipped: audio.skipped,
           activeVoices: audio.activeVoices,
+          activeByFlight: audio.activeByFlight,
+          outputProfile: audio.outputProfile,
+          volume: audio.volumeLevel,
+          levels: audio.levels,
           playedByFlight: audio.playedByFlight,
           mixGains: audio.mixGains,
           busLevels: audio.busLevels,
@@ -868,12 +892,25 @@ export function App() {
         >
           音・表示の設定 <span>{diagnostics ? "−" : "+"}</span>
         </button>
-        <span className="version">WORKSHOP · v0.5.0</span>
+        <span className="version">WORKSHOP · v0.5.1</span>
       </footer>
       {diagnostics && (
         <section className="settings" aria-label="音と表示の設定">
           <div>
             <h2>音と表示</h2>
+            <label className="spacing-label">
+              音の聴き方に合わせる
+              <select
+                aria-label="音の出力に合わせる"
+                value={outputProfile}
+                onChange={(event) =>
+                  changeProfile(event.target.value as OutputProfile)
+                }
+              >
+                <option value="speaker">本体スピーカー向け</option>
+                <option value="headphones">ヘッドホン向け</option>
+              </select>
+            </label>
             <label className="range-label">
               音量 <span>{volume}%</span>
               <input
@@ -884,8 +921,7 @@ export function App() {
                 value={volume}
                 onChange={(event) => {
                   const v = Number(event.target.value);
-                  setVolume(v);
-                  audio.setVolume(v / 100);
+                  changeVolume(v);
                 }}
               />
             </label>
@@ -914,6 +950,40 @@ export function App() {
           </div>
           <div>
             <h2>試作の観測値</h2>
+            <div className="audio-levels" aria-label="各機体の音の信号">
+              {e.flightIds.map((id) => {
+                const level = audio.levels.flights[id];
+                const hasSignal =
+                  audio.context?.state === "running" &&
+                  !muted &&
+                  volume > 0 &&
+                  !snapshot.paused &&
+                  (level?.rms ?? 0) > 0.0001;
+                const arrived =
+                  snapshot.fleet.find((f) => f.id === id)?.arrivedCount ?? 0;
+                return (
+                  <div key={id}>
+                    <span>{id}</span>
+                    <meter
+                      aria-label={`${id}の音の信号`}
+                      min={-70}
+                      max={-10}
+                      value={hasSignal ? level!.db : -70}
+                    />
+                    <small>
+                      {hasSignal
+                        ? "信号あり"
+                        : arrived === 0
+                          ? "到来待ち"
+                          : "信号なし"}
+                    </small>
+                  </div>
+                );
+              })}
+              <p>
+                アプリ内部の音の信号です。機体が見えてから音が届くまで間があります。本体の音量や実際の聞こえ方は、この表示には含みません。
+              </p>
+            </div>
             <dl>
               <dt>機体まで</dt>
               <dd>{Math.round(distance(e.pose().position, e.listener))} m</dd>

@@ -290,6 +290,44 @@ try {
   s = await state();
   assert.equal(s.vr.views, 2);
   assert(s.audio.activeVoices <= 18);
+  const routeBeforeSound = s.checksum;
+  await button(830, 350);
+  assert.equal((await state()).inspection.id, "ST-03");
+  await button(170, 452);
+  assert.equal((await state()).vr.audioPage, true);
+  await button(250, 243);
+  assert.equal((await state()).mixMode, "balanced");
+  await wait(() => {
+    const s = JSON.parse(window.render_game_to_text());
+    return (
+      s.fleet.every(
+        (f) => (s.audio.levels.flights[f.id]?.rms ?? 0) > 0.00001,
+      ) && s.audio.levels.output.rms > 0.00001
+    );
+  });
+  record(
+    "All three planes and final output contain simultaneous stereo waveforms inside VR",
+  );
+  await button(850, 345);
+  assert.equal((await state()).audio.volume, 40);
+  await button(620, 345);
+  assert.equal((await state()).audio.volume, 35);
+  await button(250, 345);
+  assert.equal((await state()).audio.outputProfile, "headphones");
+  await button(250, 345);
+  assert.equal((await state()).audio.outputProfile, "speaker");
+  await button(750, 243);
+  assert.equal((await state()).mixMode, "focus");
+  assert.equal((await state()).focusId, "ST-03");
+  await button(250, 243);
+  assert.equal((await state()).mixMode, "balanced");
+  assert.equal((await state()).checksum, routeBeforeSound);
+  await page.screenshot({ path: `${out}/06-vr-sound-settings.png` });
+  await button(150, 453);
+  assert.equal((await state()).vr.audioPage, false);
+  record(
+    "VR sound page changes volume, speaker profile and listening mix without changing flight",
+  );
   await page.screenshot({ path: `${out}/05-three-aircraft.png` });
   record(
     "Three aircraft sound independently; ray switches selection; hill origin remains in metres",
@@ -333,6 +371,22 @@ try {
   console.log(
     `${checks.length} VR scenarios passed. Physical Quest comfort and performance remain unverified.`,
   );
+} catch (error) {
+  const pages = context?.pages() ?? [];
+  for (const [i, page] of pages.entries()) {
+    await page.screenshot({ path: `${out}/failure-${i}.png` }).catch(() => {});
+    await fs.writeFile(
+      `${out}/failure-${i}.json`,
+      JSON.stringify(
+        await page
+          .evaluate(() => JSON.parse(window.render_game_to_text()))
+          .catch(() => ({})),
+        null,
+        2,
+      ),
+    );
+  }
+  throw error;
 } finally {
   await browser.close();
 }

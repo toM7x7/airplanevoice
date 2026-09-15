@@ -1744,3 +1744,16 @@ input[type="range"] {
 .vr-entry [role="alert"] {
   color: #8b442f;
 }
+.audio-levels > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 7px 0;
+}
+.audio-levels meter {
+  flex: 1;
+  min-width: 60px;
+}
+.audio-levels small {
+  width: 65px;
+}

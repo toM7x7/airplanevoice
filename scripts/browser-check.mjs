@@ -132,6 +132,20 @@ try {
   assert.equal((await state()).pendingCount, 0);
   // Settings, download, storage readback and explicit reset.
   await page.getByRole("button", { name: /音・表示の設定/ }).click();
+  await page
+    .getByRole("combobox", { name: "音の出力に合わせる" })
+    .selectOption("headphones");
+  assert.equal((await state()).audio.outputProfile, "headphones");
+  await page
+    .getByRole("combobox", { name: "音の出力に合わせる" })
+    .selectOption("speaker");
+  await page.getByRole("slider", { name: "音量", exact: true }).fill("40");
+  assert.equal((await state()).audio.volume, 40);
+  await page.getByRole("slider", { name: "音量", exact: true }).fill("35");
+  await page.screenshot({
+    path: "output/browser/08-audio-settings.png",
+    fullPage: true,
+  });
   await page.getByRole("slider", { name: "音の遅れの演出" }).fill("2");
   await page
     .getByRole("checkbox", { name: "到来波の表示を控えめにする" })

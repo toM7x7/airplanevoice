@@ -5,12 +5,66 @@ import {
   type Vec3,
 } from "../../../packages/core/src";
 
+export type OutputProfile = "speaker" | "headphones";
+const PROFILES = {
+  speaker: { refDistance: 550, rolloff: 1.1, presenceDb: 5 },
+  headphones: { refDistance: 350, rolloff: 1.4, presenceDb: 0 },
+};
+
+// Separate stereo channels so opposite-phase samples cannot hide a signal.
+function meter(ctx: AudioContext, node: AudioNode) {
+  const split = ctx.createChannelSplitter(2);
+  const channels = [0, 1].map((index) => {
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 2048;
+    split.connect(analyser, index);
+    return analyser;
+  });
+  node.connect(split);
+  const data = new Float32Array(2048);
+  return {
+    read() {
+      let energy = 0,
+        peak = 0;
+      for (const channel of channels) {
+        channel.getFloatTimeDomainData(data);
+        for (const value of data) {
+          energy += value * value;
+          peak = Math.max(peak, Math.abs(value));
+        }
+      }
+      const rms = Math.sqrt(energy / (2 * data.length));
+      return {
+        rms,
+        peak,
+        db: rms > 0 ? Math.max(-120, 20 * Math.log10(rms)) : -120,
+      };
+    },
+    dispose() {
+      node.disconnect(split);
+      split.disconnect();
+      channels.forEach((a) => a.disconnect());
+    },
+  };
+}
+type Meter = ReturnType<typeof meter>;
+type Level = ReturnType<Meter["read"]>;
+
 // Temporary, locally synthesized sound. No recordings or external media.
 // Each aircraft has its own bounded voice budget and a smoothly mixed bus.
 export class AircraftAudio {
   context: AudioContext | null = null;
   private master: GainNode | null = null;
   private buffer: AudioBuffer | null = null;
+  private presence: BiquadFilterNode | null = null;
+  private profile: OutputProfile = "speaker";
+  private outputMeter: Meter | null = null;
+  private busMeters = new Map<FlightId, Meter>();
+  private meteredAt = -Infinity;
+  private metered: {
+    flights: Partial<Record<FlightId, Level>>;
+    output: Level;
+  } = { flights: {}, output: { rms: 0, peak: 0, db: -120 } };
   private buses = new Map<FlightId, GainNode>();
   mixGains: Partial<Record<FlightId, number>> = { "ST-01": 1 };
   playedByFlight: Partial<Record<FlightId, number>> = {};
@@ -25,6 +79,45 @@ export class AircraftAudio {
   skipped = 0;
   get activeVoices() {
     return this.voices.size;
+  }
+  get activeByFlight() {
+    return Object.fromEntries(
+      [...this.buses.keys()].map((id) => [
+        id,
+        [...this.voices].filter((v) => v.flightId === id).length,
+      ]),
+    );
+  }
+  get outputProfile() {
+    return this.profile;
+  }
+  get volumeLevel() {
+    return Math.round(this.volume * 100);
+  }
+  setOutputProfile(profile: OutputProfile) {
+    if (profile !== "speaker" && profile !== "headphones") return;
+    this.profile = profile;
+    const p = PROFILES[profile];
+    if (this.context && this.presence)
+      this.presence.gain.setTargetAtTime(
+        p.presenceDb,
+        this.context.currentTime,
+        0.15,
+      );
+    // Existing grains retain their short envelope; subsequent grains adopt the
+    // new distance curve, avoiding an abrupt level change in sounding sources.
+  }
+  get levels() {
+    const now = this.context?.currentTime ?? 0;
+    if (now - this.meteredAt < 0.1) return this.metered;
+    this.meteredAt = now;
+    this.metered = {
+      flights: Object.fromEntries(
+        [...this.busMeters].map(([id, meter]) => [id, meter.read()]),
+      ),
+      output: this.outputMeter?.read() ?? { rms: 0, peak: 0, db: -120 },
+    };
+    return this.metered;
   }
   setMix(gains: Partial<Record<FlightId, number>>) {
     this.mixGains = { ...gains };
@@ -44,6 +137,7 @@ export class AircraftAudio {
       bus.gain.value = this.mixGains[id] ?? 0;
       bus.connect(this.master!);
       this.buses.set(id, bus);
+      this.busMeters.set(id, meter(this.context!, bus));
     }
     return bus;
   }
@@ -57,12 +151,21 @@ export class AircraftAudio {
       this.context = new AudioContext();
       this.master = this.context.createGain();
       const limiter = this.context.createDynamicsCompressor();
+      this.presence = this.context.createBiquadFilter();
+      this.presence.type = "peaking";
+      this.presence.frequency.value = 850;
+      this.presence.Q.value = 0.65;
+      this.presence.gain.value = PROFILES[this.profile].presenceDb;
       limiter.threshold.value = -16;
       limiter.knee.value = 10;
       limiter.ratio.value = 8;
       limiter.attack.value = 0.004;
       limiter.release.value = 0.2;
-      this.master.connect(limiter).connect(this.context.destination);
+      this.master
+        .connect(this.presence)
+        .connect(limiter)
+        .connect(this.context.destination);
+      this.outputMeter = meter(this.context, limiter);
       const frames = this.context.sampleRate * 4;
       this.buffer = this.context.createBuffer(
         1,
@@ -166,8 +269,8 @@ export class AircraftAudio {
     const panner = ctx.createPanner();
     panner.panningModel = "HRTF";
     panner.distanceModel = "inverse";
-    panner.refDistance = 350;
-    panner.rolloffFactor = 1.4;
+    panner.refDistance = PROFILES[this.profile].refDistance;
+    panner.rolloffFactor = PROFILES[this.profile].rolloff;
     panner.maxDistance = 10000;
     // The source remains at the emission position, never at the current aircraft.
     panner.positionX.value = arrival.emission.position.x;
@@ -208,6 +311,9 @@ export class AircraftAudio {
   }
   dispose() {
     this.stop();
+    this.outputMeter?.dispose();
+    this.busMeters.forEach((meter) => meter.dispose());
+    this.busMeters.clear();
     this.buses.forEach((bus) => bus.disconnect());
     this.buses.clear();
     void this.context?.close();

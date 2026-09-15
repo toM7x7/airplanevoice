@@ -9,7 +9,18 @@ import type { AircraftAudio } from "./audio";
 
 type VrStatus =
   "checking" | "unsupported" | "ready" | "entering" | "presenting";
-type Action = "primary" | "sound" | "exit" | FlightId;
+type Action =
+  | "primary"
+  | "sound"
+  | "exit"
+  | "settings"
+  | "back"
+  | "all"
+  | "focus"
+  | "profile"
+  | "quieter"
+  | "louder"
+  | FlightId;
 const BUTTONS: {
   x: number;
   y: number;
@@ -26,6 +37,16 @@ const BUTTONS: {
     h: 62,
     action,
   })),
+  { x: 724, y: 426, w: 270, h: 60, action: "exit" },
+  { x: 30, y: 426, w: 270, h: 60, action: "settings" },
+];
+const AUDIO_BUTTONS: typeof BUTTONS = [
+  { x: 30, y: 205, w: 470, h: 78, action: "all" },
+  { x: 524, y: 205, w: 470, h: 78, action: "focus" },
+  { x: 30, y: 315, w: 470, h: 62, action: "profile" },
+  { x: 524, y: 315, w: 220, h: 62, action: "quieter" },
+  { x: 774, y: 315, w: 220, h: 62, action: "louder" },
+  { x: 30, y: 426, w: 270, h: 60, action: "back" },
   { x: 724, y: 426, w: 270, h: 60, action: "exit" },
 ];
 
@@ -74,8 +95,11 @@ export class VrRuntime {
   private selected: FlightId | null = null;
   private tracked = false;
   private soundOn = false;
+  private audioPage = false;
   onPrimary = () => {};
   onSound = () => {};
+  onVolume = (_delta: number) => {};
+  onProfile = () => {};
   onSelect = (_id: FlightId) => {};
 
   constructor(
@@ -155,6 +179,7 @@ export class VrRuntime {
       this.lastFrameAt = 0;
       this.frameIntervals = [];
       this.panelPlaced = false;
+      this.audioPage = false;
       this.panelAt = 0;
       this.tracked = false;
       session.addEventListener("visibilitychange", this.visibilityChange);
@@ -333,7 +358,7 @@ export class VrRuntime {
       if (hit?.uv) {
         const x = hit.uv.x * 1024,
           y = (1 - hit.uv.y) * 512;
-        const button = BUTTONS.find(
+        const button = (this.audioPage ? AUDIO_BUTTONS : BUTTONS).find(
           (b) => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h,
         );
         if (button) this.act(button.action);
@@ -366,6 +391,14 @@ export class VrRuntime {
     if (action === "primary") this.onPrimary();
     else if (action === "sound") this.onSound();
     else if (action === "exit") void this.exit();
+    else if (action === "settings" || action === "back")
+      this.audioPage = action === "settings";
+    else if (action === "all") this.experience.setMix("balanced");
+    else if (action === "focus")
+      this.experience.setMix("focus", this.selected ?? this.experience.focusId);
+    else if (action === "profile") this.onProfile();
+    else if (action === "quieter") this.onVolume(-5);
+    else if (action === "louder") this.onVolume(5);
     else if (this.experience.flightIds.includes(action)) {
       this.selected = action;
       this.onSelect(action);
@@ -460,16 +493,28 @@ export class VrRuntime {
             ? e.evolution.enabled
               ? "次の空を待っています"
               : "もう一周、眺められます"
-            : "姿は先へ。音はあとから。";
-    ctx.fillText(status, 30, 100);
+            : e.flights.every((f) => f.arrivedCount === 0)
+              ? "音の到来を待っています"
+              : "姿は先へ。音はあとから。";
+    ctx.fillText(
+      this.audioPage
+        ? `音量 ${this.audio.volumeLevel}%  /  ${this.audio.outputProfile === "speaker" ? "本体スピーカー向け" : "ヘッドホン向け"}`
+        : status,
+      30,
+      100,
+    );
     const detail = info?.visible
       ? `${info.id}   ${Math.round(info.speedMps!)} m/s   ${info.headingLabel} ${Math.round(info.headingDeg!)}°   距離 ${Math.round(info.distanceM!)} m`
       : info
         ? `${info.id}  ${info.state === "waiting" ? "飛行開始を待っています" : "飛行を終えました"}`
         : "機体を指してトリガーで選択 → 速度・方向";
     ctx.fillStyle = "#b9d6d0";
-    ctx.fillText(detail, 30, 152);
-    for (const b of BUTTONS) {
+    const mixLabel =
+      e.mixMode === "balanced"
+        ? "空全体を聴いています"
+        : `${e.focusId}を強めに聴いています`;
+    ctx.fillText(this.audioPage ? mixLabel : detail, 30, 152);
+    for (const b of this.audioPage ? AUDIO_BUTTONS : BUTTONS) {
       const isPlane = b.action.startsWith("ST-");
       const enabled = !isPlane || e.flightIds.includes(b.action as FlightId);
       ctx.fillStyle = !enabled
@@ -496,13 +541,52 @@ export class VrRuntime {
               : "音をオン"
             : b.action === "exit"
               ? "VRを終了"
-              : b.action;
+              : b.action === "settings"
+                ? "音の設定"
+                : b.action === "back"
+                  ? "空の操作へ"
+                  : b.action === "all"
+                    ? "空全体を聴く"
+                    : b.action === "focus"
+                      ? `${selected ?? e.focusId}を強めに聴く`
+                      : b.action === "profile"
+                        ? this.audio.outputProfile === "speaker"
+                          ? "ヘッドホン向けに切替"
+                          : "本体スピーカー向けに切替"
+                        : b.action === "quieter"
+                          ? "音量 −5"
+                          : b.action === "louder"
+                            ? "音量 ＋5"
+                            : b.action;
       ctx.fillText(label, b.x + 22, b.y + b.h / 2 + 10);
+      if (isPlane && enabled) {
+        const db = this.audio.levels.flights[b.action as FlightId]?.db ?? -120;
+        const sounding =
+          soundOn &&
+          this.audio.volumeLevel > 0 &&
+          !e.paused &&
+          this.audio.context?.state === "running";
+        ctx.fillStyle = "#9ee6c9";
+        ctx.fillRect(
+          b.x + 16,
+          b.y + b.h - 6,
+          (b.w - 32) *
+            (sounding ? Math.max(0, Math.min(1, (db + 70) / 60)) : 0),
+          3,
+        );
+      }
     }
     ctx.fillStyle = "#b9d6d0";
     ctx.font = "22px sans-serif";
-    ctx.fillText("トリガー：選ぶ  /  グリップ：操作盤を呼ぶ", 30, 429);
-    ctx.fillText("地上の観察席・1人用VR", 30, 474);
+    ctx.fillText(
+      this.audioPage
+        ? "音量はアプリ内の値です。本体の音量は別に調整。"
+        : `${mixLabel}  /  バー：各機体の音の信号`,
+      30,
+      410,
+    );
+    ctx.font = "18px sans-serif";
+    ctx.fillText("グリップ：操作盤を呼ぶ", 318, 460);
     this.panel.material.map!.needsUpdate = true;
   }
 
@@ -533,6 +617,7 @@ export class VrRuntime {
         : null,
       selected: this.selected,
       soundOn: this.soundOn,
+      audioPage: this.audioPage,
     };
   }
 }
