@@ -1,6 +1,6 @@
 # 公開先・クラウド構成・展示会の予備動作
 
-更新: 2026-09-15 / v0.5.0
+更新: 2026-09-15 / v0.5.1
 
 ## 試遊版の公開先
 
@@ -8,7 +8,7 @@ GitHub Pagesで静的Webアプリの試遊版を配信する。独自ドメイ�
 
 公開URL: [SOUND TRAILを試す](https://tom7x7.github.io/airplanevoice/)
 
-v0.5.0の1人用VR試作を公開。コミット`6b2b6ea`の[公開処理](https://github.com/toM7x7/airplanevoice/actions/runs/34926794170)・[CI](https://github.com/toM7x7/airplanevoice/actions/runs/34926794122)が成功。公開URLにIWERをテスト側から注入し、VR15項目と実時間の1機・3機の音声を確認した。配布アプリにエミュレーターは含めない。Quest 3での実機確認は[6項目](quest-vr.md)を残す。
+v0.5.1の音の改善版を公開。コミット`3dc13fa`の[公開処理](https://github.com/toM7x7/airplanevoice/actions/runs/34941367316)・[CI](https://github.com/toM7x7/airplanevoice/actions/runs/34941367306)が成功。公開URLにIWERをテスト側から注入し、VR17項目が合格。3機と合成後の同時波形、VR内の音量・出力設定・聴き方の切り替えを確認した。単体のオフライン再読込・設定復元・初周と第2周の実時間飛行・音声ノードの再生開始・接続復帰も合格。配布アプリにエミュレーターは含めない。Quest 3実機で音が改善したかは[再試遊](quest-vr.md)で確認する。
 
 `.github/workflows/pages.yml` がmainへの変更を受け、テスト・ビルドを通してdistを公開する。3D描画と音は参加者のブラウザで動く。現段階の「クラウド」はWebアプリの配信であり、共有部屋やAIのクラウド処理はまだ接続していない。
 

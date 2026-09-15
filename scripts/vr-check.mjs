@@ -56,33 +56,59 @@ try {
     page.evaluate(() => JSON.parse(window.render_game_to_text()));
   const wait = (predicate, arg, timeout = 15000) =>
     page.waitForFunction(predicate, arg, { timeout });
+  const frames = async (count = 2) => {
+    const target = (await state()).vr.frames + count;
+    await wait(
+      (target) => {
+        const { vr } = JSON.parse(window.render_game_to_text());
+        return vr.status !== "presenting" || vr.frames >= target;
+      },
+      target,
+    );
+  };
   const press = async (id = "trigger") => {
     await page.evaluate(
       (id) => xrDevice.controllers.right.updateButtonValue(id, 1),
       id,
     );
-    await page.waitForTimeout(160);
+    await frames();
     await page.evaluate(
       (id) => xrDevice.controllers.right.updateButtonValue(id, 0),
       id,
     );
-    await page.waitForTimeout(160);
+    await frames();
   };
-  const aim = async (world) => {
-    const s = await state();
+  const aim = async (world, flightId = null) => {
     await page.evaluate(
-      ({ world, origin }) => {
-        const c = xrDevice.controllers.right;
-        c.position.set(0.25, 1.3, -0.2);
-        const d = world.map((n, i) => n - origin[i] - [0.25, 1.3, -0.2][i]);
-        const length = Math.hypot(...d),
-          [x, y, z] = d.map((n) => n / length);
-        const norm = Math.hypot(y, -x, 1 - z);
-        c.quaternion.set(y / norm, -x / norm, 0, (1 - z) / norm);
+      ({ world, flightId }) => {
+        window.stopVrAim?.();
+        let tracking = true;
+        window.stopVrAim = () => {
+          tracking = false;
+        };
+        const update = () => {
+          if (!tracking) return;
+          const s = JSON.parse(window.render_game_to_text());
+          const p =
+            flightId && s.fleet.find((f) => f.id === flightId).pose.position;
+          const target = p ? [p.x, p.y, p.z] : world;
+          const c = xrDevice.controllers.right;
+          c.position.set(0.25, 1.3, -0.2);
+          const d = target.map(
+            (n, i) => n - s.vr.origin[i] - [0.25, 1.3, -0.2][i],
+          );
+          const length = Math.hypot(...d),
+            [x, y, z] = d.map((n) => n / length);
+          const norm = Math.hypot(y, -x, 1 - z);
+          c.quaternion.set(y / norm, -x / norm, 0, (1 - z) / norm);
+          // Follow the moving target while slow software-rendered frames process input.
+          if (flightId) xrDevice.activeSession.requestAnimationFrame(update);
+        };
+        update();
       },
-      { world, origin: s.vr.origin },
+      { world, flightId },
     );
-    await page.waitForTimeout(180);
+    await frames();
   };
   const button = async (x, y) => {
     const { panel } = (await state()).vr;
@@ -206,8 +232,7 @@ try {
   await wait(() => !JSON.parse(window.render_game_to_text()).paused);
   record("Spatial pause drains voices and freezes time; resume continues");
 
-  const p = (await state()).aircraft.position;
-  await aim([p.x, p.y, p.z]);
+  await aim(null, "ST-01");
   await press();
   assert.equal((await state()).vr.selected, "ST-01");
   await button(750, 243);
@@ -283,8 +308,7 @@ try {
   );
   await button(500, 350);
   assert.equal((await state()).inspection.id, "ST-02");
-  const firstPlane = (await state()).aircraft.position;
-  await aim([firstPlane.x, firstPlane.y, firstPlane.z]);
+  await aim(null, "ST-01");
   await press();
   assert.equal((await state()).inspection.id, "ST-01");
   s = await state();
