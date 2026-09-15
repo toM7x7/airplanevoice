@@ -272,6 +272,7 @@ function World({
     window.__soundTrailRender = {
       calls: gl.info.render.calls,
       triangles: gl.info.render.triangles,
+      geometries: gl.info.memory.geometries,
     };
   });
   return (
@@ -292,7 +293,7 @@ function World({
             aircraft.current[index] = mesh;
           }}
         >
-          <Aircraft accent={a.accent} />
+          <Aircraft accent={a.accent} design={e.aircraftDesign} />
         </group>
       ))}
       <primitive object={lineObject} ref={design} />

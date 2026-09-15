@@ -1,6 +1,6 @@
 {
   "name": "sound-trail",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -8,13 +8,15 @@
   },
   "scripts": {
     "dev": "vite --config apps/desktop/vite.config.ts --host 127.0.0.1",
-    "build": "tsc --noEmit && vite build --config apps/desktop/vite.config.ts",
+    "build": "tsc --noEmit && vite build --config apps/desktop/vite.config.ts && node scripts/write-offline.mjs",
     "preview": "vite preview --config apps/desktop/vite.config.ts --host 127.0.0.1",
     "test": "vitest run",
     "test:watch": "vitest",
     "check": "tsc --noEmit",
     "test:browser": "node scripts/browser-check.mjs",
-    "test:airspace": "node scripts/airspace-check.mjs"
+    "test:airspace": "node scripts/airspace-check.mjs",
+    "test:workshop": "node scripts/workshop-check.mjs",
+    "test:offline": "node scripts/offline-check.mjs"
   },
   "dependencies": {
     "@react-three/fiber": "^9.7.0",

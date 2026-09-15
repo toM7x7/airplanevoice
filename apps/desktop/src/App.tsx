@@ -14,11 +14,13 @@ import {
   finitePoint,
   type PresetId,
   type RouteSpec,
+  validateAircraft,
 } from "../../../packages/core/src";
 import { AircraftAudio } from "./audio";
 import { Scene, type ViewState } from "./Scene";
 import { RouteEditor } from "./RouteEditor";
 import { AirspaceControls } from "./AirspaceControls";
+import { Workshop } from "./Workshop";
 
 function Icon({
   name,
@@ -78,6 +80,7 @@ function Icon({
 }
 
 const STORAGE_KEY = "sound-trail.desktop.route.v1";
+const AIRCRAFT_KEY = "sound-trail.desktop.aircraft.v1";
 function loadExperience() {
   const e = new Experience();
   try {
@@ -98,6 +101,16 @@ function loadExperience() {
   } catch {
     /* Storage is optional; a blocked or invalid store uses the preset. */
   }
+  try {
+    const raw = localStorage.getItem(AIRCRAFT_KEY);
+    if (raw) {
+      const design = JSON.parse(raw);
+      validateAircraft(design);
+      e.setAircraftDesign(design);
+    }
+  } catch {
+    /* Aircraft and route recover independently. */
+  }
   return e;
 }
 
@@ -117,6 +130,9 @@ export function App() {
   const [message, setMessage] = useState("");
   const [help, setHelp] = useState(false);
   const [diagnostics, setDiagnostics] = useState(false);
+  const [workshop, setWorkshop] = useState(false);
+  const [offlineReady, setOfflineReady] = useState(false);
+  const [online, setOnline] = useState(navigator.onLine);
   const view = useRef<ViewState>({ yaw: 0, pitch: 0.32, zoom: false });
   const manual = useRef(false);
   const messageTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -132,6 +148,7 @@ export function App() {
   const save = useCallback(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(e.spec));
+      localStorage.setItem(AIRCRAFT_KEY, JSON.stringify(e.aircraftDesign));
     } catch {
       notifyMessage(
         "このブラウザでは航路を保存できません。今の画面では続けられます。",
@@ -179,6 +196,7 @@ export function App() {
   function reset() {
     audio.stop();
     e.reset();
+    setWorkshop(false);
     setObserver("garden");
     setDelay(1.6);
     setZoom(false);
@@ -199,9 +217,10 @@ export function App() {
       [
         JSON.stringify(
           {
-            version: "0.2.0",
+            version: "0.3.0",
             platform: "desktop-local",
             route: e.spec,
+            aircraftDesign: e.aircraftDesign,
             recipe: e.recipe,
             airspace: e.airspace,
             listening: {
@@ -231,6 +250,28 @@ export function App() {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
   useEffect(() => {
+    const connection = () => setOnline(navigator.onLine);
+    window.addEventListener("online", connection);
+    window.addEventListener("offline", connection);
+    let live = true;
+    if (import.meta.env.PROD && "serviceWorker" in navigator) {
+      navigator.serviceWorker
+        .register(`${import.meta.env.BASE_URL}sw.js`)
+        .then(() => navigator.serviceWorker.ready)
+        .then(() => {
+          if (live) setOfflineReady(true);
+        })
+        .catch(() => {
+          /* Optional cache; normal online play remains available. */
+        });
+    }
+    return () => {
+      live = false;
+      window.removeEventListener("online", connection);
+      window.removeEventListener("offline", connection);
+    };
+  }, []);
+  useEffect(() => {
     audio.setMix(e.mixGains);
   }, [
     audio,
@@ -249,6 +290,8 @@ export function App() {
           "meters, +X right/east, +Y up, -Z forward/north; origin at meadow observer",
         routeId: e.spec.id,
         routePoints: e.spec.rawPoints.length,
+        generator: e.spec.generator ?? null,
+        flightSettings: e.spec.flight ?? null,
         listener: e.listener,
         aircraft: e.pose(),
         designLineVisible: e.phase === "EDIT",
@@ -265,6 +308,7 @@ export function App() {
         },
         render: window.__soundTrailRender,
         view: view.current,
+        offline: { ready: offlineReady, online },
       });
     if (import.meta.env.DEV)
       window.advanceTime = async (ms: number) => {
@@ -278,7 +322,7 @@ export function App() {
           requestAnimationFrame(() => resolve()),
         );
       };
-  }, [e, audio, muted]);
+  }, [e, audio, muted, offlineReady, online]);
   useEffect(() => {
     function onHidden() {
       if (
@@ -333,7 +377,7 @@ export function App() {
 
   return (
     <main
-      className={`app ${editing ? "is-editing" : "is-flying"} ${e.airspace.aircraftCount > 1 ? "has-fleet" : ""}`}
+      className={`app ${editing ? "is-editing" : "is-flying"} ${e.airspace.aircraftCount > 1 ? "has-fleet" : ""} ${editing && workshop ? "is-workshop" : ""}`}
     >
       <header className="topbar">
         <a className="brand" href="./" aria-label="音航跡 ホーム">
@@ -346,7 +390,7 @@ export function App() {
         </a>
         <div className="top-actions">
           <span className="edition">
-            DESKTOP STUDY <span>02</span>
+            SKY WORKSHOP <span>03</span>
           </span>
           <button
             className="quiet-button"
@@ -380,104 +424,133 @@ export function App() {
                 あとの音まで、待ってみる。
               </p>
             </div>
+            {editing && (
+              <button
+                className="workshop-toggle"
+                aria-expanded={workshop}
+                onClick={() => setWorkshop(!workshop)}
+              >
+                {workshop ? "← 自由に線を描く" : "つくる実験室 →"}
+              </button>
+            )}
             <AirspaceControls experience={e} />
             {editing ? (
-              <>
-                <div className="section-label">
-                  <span>01</span>
-                  <h2>飛び方を選ぶ</h2>
-                </div>
-                <div className="preset-list">
-                  {PRESETS.map((p) => (
+              workshop ? (
+                <Workshop
+                  experience={e}
+                  onSave={save}
+                  onInspect={() => {
+                    const p = e.pose().position,
+                      x = p.x - e.listener.x,
+                      y = p.y - e.listener.y,
+                      z = p.z - e.listener.z;
+                    view.current.yaw = Math.atan2(-x, -z);
+                    view.current.pitch = Math.atan2(y, Math.hypot(x, z));
+                    view.current.zoom = true;
+                    setZoom(true);
+                  }}
+                />
+              ) : (
+                <>
+                  <div className="section-label">
+                    <span>01</span>
+                    <h2>飛び方を選ぶ</h2>
+                  </div>
+                  <div className="preset-list">
+                    {PRESETS.map((p) => (
+                      <button
+                        key={p.id}
+                        className={`preset ${e.spec.id === p.id ? "chosen" : ""}`}
+                        onClick={() => {
+                          e.setRoute(
+                            presetRoute(
+                              p.id as PresetId,
+                              e.spec.revision + 1,
+                              altitude,
+                            ),
+                          );
+                          save();
+                        }}
+                        aria-pressed={e.spec.id === p.id}
+                      >
+                        <svg viewBox="0 0 52 35" aria-hidden="true">
+                          <path
+                            d={
+                              p.id === "eight"
+                                ? "M26 18C6-9-9 35 15 27L37 8C62-7 61 45 26 18Z"
+                                : p.id === "rise"
+                                  ? "M4 25C12 8 22 26 28 13S47 4 47 15 29 34 4 25Z"
+                                  : "M5 19C5 0 47 0 47 19S5 39 5 19Z"
+                            }
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.4"
+                          />
+                        </svg>
+                        <span>
+                          <strong>{p.name}</strong>
+                          <small>{p.caption}</small>
+                        </span>
+                        <span className="preset-number">{p.number}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="section-label edit-label">
+                    <span>02</span>
+                    <h2>線を少し、変えてみる</h2>
                     <button
-                      key={p.id}
-                      className={`preset ${e.spec.id === p.id ? "chosen" : ""}`}
+                      className="icon-button"
+                      aria-label="元に戻す"
+                      disabled={!e.canUndo}
                       onClick={() => {
-                        e.setRoute(
-                          presetRoute(
-                            p.id as PresetId,
-                            e.spec.revision + 1,
-                            altitude,
-                          ),
-                        );
+                        e.undo();
                         save();
                       }}
-                      aria-pressed={e.spec.id === p.id}
                     >
-                      <svg viewBox="0 0 52 35" aria-hidden="true">
-                        <path
-                          d={
-                            p.id === "eight"
-                              ? "M26 18C6-9-9 35 15 27L37 8C62-7 61 45 26 18Z"
-                              : p.id === "rise"
-                                ? "M4 25C12 8 22 26 28 13S47 4 47 15 29 34 4 25Z"
-                                : "M5 19C5 0 47 0 47 19S5 39 5 19Z"
-                          }
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.4"
-                        />
-                      </svg>
-                      <span>
-                        <strong>{p.name}</strong>
-                        <small>{p.caption}</small>
-                      </span>
-                      <span className="preset-number">{p.number}</span>
+                      <Icon name="undo" size={15} />
                     </button>
-                  ))}
-                </div>
-                <div className="section-label edit-label">
-                  <span>02</span>
-                  <h2>線を少し、変えてみる</h2>
-                  <button
-                    className="icon-button"
-                    aria-label="元に戻す"
-                    disabled={!e.canUndo}
-                    onClick={() => {
-                      e.undo();
-                      save();
-                    }}
-                  >
-                    <Icon name="undo" size={15} />
-                  </button>
-                </div>
-                <RouteEditor
-                  experience={e}
-                  onChange={save}
-                  onError={notifyMessage}
-                />
-                <label className="range-label">
-                  空の高さ{" "}
-                  <span>
-                    {altitude} <small>m</small>
-                  </span>
-                  <input
-                    aria-label="空の高さ"
-                    type="range"
-                    min="140"
-                    max="440"
-                    step="20"
-                    value={altitude}
-                    onChange={(event) => {
-                      const value = Number(event.target.value);
-                      e.setRoute({
-                        ...e.spec,
-                        revision: e.spec.revision + 1,
-                        rawPoints: e.spec.rawPoints.map((p) => ({
-                          ...p,
-                          y: value + (p.y - altitude),
-                        })),
-                      });
-                      save();
-                    }}
+                  </div>
+                  <RouteEditor
+                    experience={e}
+                    onChange={save}
+                    onError={notifyMessage}
                   />
-                </label>
-                {e.route.notices.map((text) => (
-                  <p className="route-notice" key={text}>
-                    {text}
-                  </p>
-                ))}
-              </>
+                  <label className="range-label">
+                    空の高さ{" "}
+                    <span>
+                      {altitude} <small>m</small>
+                    </span>
+                    <input
+                      aria-label="空の高さ"
+                      type="range"
+                      min="140"
+                      max="440"
+                      step="20"
+                      value={altitude}
+                      onChange={(event) => {
+                        const value = Number(event.target.value);
+                        e.setRoute({
+                          ...e.spec,
+                          revision: e.spec.revision + 1,
+                          generator: e.spec.generator
+                            ? { ...e.spec.generator, altitudeM: value }
+                            : undefined,
+                          rawPoints: e.spec.rawPoints.map((p) => ({
+                            ...p,
+                            y: value + (p.y - altitude),
+                          })),
+                        });
+                        save();
+                      }}
+                    />
+                  </label>
+                  {e.route.notices.map((text) => (
+                    <p className="route-notice" key={text}>
+                      {text}
+                    </p>
+                  ))}
+                </>
+              )
             ) : (
               <div className="flight-sidebar">
                 <div className="section-label">
@@ -558,7 +631,8 @@ export function App() {
           )}
           <div className="sidebar-footer">
             <span className="status-dot" />
-            ひとりで、空を観察中<button onClick={reset}>リセット</button>
+            {online ? "ひとりで、空を観察中" : "オフラインで観察中"}
+            <button onClick={reset}>リセット</button>
           </div>
         </aside>
         <div className="viewport">
@@ -631,7 +705,8 @@ export function App() {
             )}
           </div>
           <div className="horizon-note">
-            58 m/s <span>／</span> FOUR ENGINES <span>／</span> ONE OPEN SKY
+            {e.route.speedMps} m/s <span>／</span>{" "}
+            {e.aircraftDesign.engineCount} ENGINES <span>／</span> ONE OPEN SKY
           </div>
           <div className="view-bottom">
             <div className="observer-control">
@@ -693,7 +768,7 @@ export function App() {
         >
           音・表示の設定 <span>{diagnostics ? "−" : "+"}</span>
         </button>
-        <span className="version">AIRSPACE · v0.2</span>
+        <span className="version">WORKSHOP · v0.3</span>
       </footer>
       {diagnostics && (
         <section className="settings" aria-label="音と表示の設定">
@@ -754,7 +829,14 @@ export function App() {
               <dd>{snapshot.checksum}</dd>
             </dl>
             <p>
-              この版はPCでの一人用試作です。最大3機で聴き比べられます。管制字幕は飛行状況に応じた定型案内で、AIは未接続です。Questでの共有は今後の段階です。
+              この版は一人用の試作です。最大3機で聴き比べられます。管制字幕は定型案内で、AIは未接続です。Questでの共有は今後の段階です。
+            </p>
+            <p>
+              {offlineReady
+                ? "この端末に単体体験を保存しました。通信が切れても、再読み込みして遊べます。"
+                : import.meta.env.DEV
+                  ? "開発環境ではオフライン保存を使いません。配布版で確認できます。"
+                  : "オフラインで使うための準備中です。"}
             </p>
             <button className="text-button" onClick={exportLogs}>
               この体験のログを保存 <Icon name="arrow" size={14} />

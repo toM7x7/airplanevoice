@@ -12,6 +12,13 @@ import {
 import { flightPose } from "./flight";
 import { distance } from "./math";
 import { TowerDirector, type TowerFact, type TowerCue } from "./tower";
+import {
+  DEFAULT_AIRCRAFT,
+  validateAircraft,
+  workshopSpec,
+  type AircraftDesign,
+  type WorkshopRecipe,
+} from "./workshop";
 import { OBSERVERS, presetRoute } from "./presets";
 import { selectRecipe, validRecipe } from "./recipe";
 import { compileRoute } from "./route";
@@ -59,6 +66,7 @@ export interface ExperienceSnapshot {
   mixGains: Partial<Record<FlightId, number>>;
   towerEnabled: boolean;
   towerCue: TowerCue | null;
+  aircraftDesign: AircraftDesign;
 }
 export interface LogEntry {
   atMs: number;
@@ -85,6 +93,7 @@ export class Experience {
   focusId: FlightId = "ST-01";
   flights: FlightPlan[] = [];
   tower = new TowerDirector();
+  aircraftDesign: AircraftDesign = { ...DEFAULT_AIRCRAFT };
   onArrival?: (arrival: FlightArrival, nowMs: number) => void;
   private listeners = new Set<() => void>();
   private history: RouteSpec[] = [];
@@ -113,6 +122,25 @@ export class Experience {
   }
   get canUndo() {
     return this.canEdit && this.history.length > 0;
+  }
+  setAircraftDesign(design: AircraftDesign) {
+    if (!this.canEdit) return;
+    validateAircraft(design);
+    this.aircraftDesign = { ...design };
+    this.log("aircraft_design", { ...design });
+    this.notify();
+  }
+  applyWorkshop(recipe: WorkshopRecipe) {
+    if (!this.canEdit) return;
+    const spec = workshopSpec(recipe, this.spec.revision + 1);
+    // Validate the complete proposal before committing either aircraft or route.
+    compileRoute(spec);
+    this.setRoute(spec);
+    this.setAircraftDesign(recipe.aircraft);
+    this.log("workshop_applied", {
+      version: recipe.version,
+      seed: recipe.route.seed,
+    });
   }
   get flightIds() {
     return AIRCRAFT.slice(0, this.airspace.aircraftCount).map((a) => a.id);
@@ -231,6 +259,7 @@ export class Experience {
     this.mixMode = "focus";
     this.focusId = "ST-01";
     this.tower.setEnabled(false);
+    this.aircraftDesign = { ...DEFAULT_AIRCRAFT };
     this.listener = { ...OBSERVERS[0].position };
     this.setRoute(presetRoute("orbit"), false);
     this.log("session_reset");
@@ -392,6 +421,7 @@ export class Experience {
       mixGains: this.mixGains,
       towerEnabled: this.tower.enabled,
       towerCue: this.tower.cue,
+      aircraftDesign: { ...this.aircraftDesign },
     };
   }
 }

@@ -8,6 +8,129 @@
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
 }
+.is-workshop .sidebar-heading {
+  display: none;
+}
+.workshop-toggle {
+  width: 100%;
+  text-align: left;
+  padding: 12px 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+.workshop-panel h2 {
+  font:
+    19px "Yu Mincho",
+    serif;
+  font-weight: 400;
+  margin: 22px 0 15px;
+}
+.workshop-panel .range-label {
+  margin: 20px 0;
+}
+.workshop-label {
+  font-size: 11px;
+  margin-top: 22px;
+}
+.workshop-note {
+  color: #728073;
+  font-size: 10px;
+  line-height: 1.9;
+}
+.workshop-action {
+  width: 100%;
+  margin-top: 18px;
+}
+.workshop-panel textarea {
+  width: 100%;
+  min-height: 340px;
+  resize: vertical;
+  padding: 12px 10px;
+  color: #29443e;
+  background: #eaf0e6;
+  border: 1px solid #b9caba;
+  border-radius: 4px;
+  font:
+    11px/1.6 Consolas,
+    monospace;
+  tab-size: 2;
+}
+.workshop-panel input[type="number"] {
+  min-width: 0;
+  width: 100%;
+  border: 1px solid #b9caba;
+  padding: 7px 5px;
+  border-radius: 3px;
+  background: #f9faf4;
+  color: inherit;
+  font:
+    11px Consolas,
+    monospace;
+}
+.anchor-map svg {
+  display: block;
+  width: 100%;
+  cursor: crosshair;
+  touch-action: none;
+  border: 1px solid #ccd7c8;
+}
+.anchor-fields {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.anchor-fields fieldset {
+  border: 1px solid #ccd7c8;
+  min-width: 0;
+  flex: 1;
+  padding: 8px;
+}
+.anchor-fields legend {
+  font:
+    11px Consolas,
+    monospace;
+  padding: 0 4px;
+}
+.anchor-fields label {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 10px;
+  margin: 6px 0;
+}
+.seed-row {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  margin: 20px 0;
+}
+.seed-row label {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+}
+.seed-row input {
+  display: block;
+  margin-top: 7px;
+}
+.seed-row button {
+  border: 1px solid #b9caba;
+  padding: 7px;
+  font-size: 11px;
+  border-radius: 3px;
+}
+.workshop-error {
+  background: #f6e7dd;
+  color: #8d4329;
+  border-left: 3px solid #b86e44;
+  padding: 10px;
+  font-size: 11px;
+  line-height: 1.8;
+}
+.workshop-status {
+  font-size: 10px;
+  color: #416b51;
+}
 * {
   box-sizing: border-box;
 }

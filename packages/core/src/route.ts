@@ -9,6 +9,7 @@ import {
   checksum,
 } from "./math";
 import { HEAVY, presetRoute } from "./presets";
+import { generatedPoints, validateFlight, validateGenerator } from "./workshop";
 import type {
   AircraftProfile,
   CompiledRoute,
@@ -101,6 +102,10 @@ export function compileRoute(
   spec: RouteSpec,
   profile: AircraftProfile = HEAVY,
 ): CompiledRoute {
+  if (spec.flight) {
+    validateFlight(spec.flight);
+    profile = { ...profile, ...spec.flight };
+  }
   if (
     ![
       profile.speedMps,
@@ -115,13 +120,18 @@ export function compileRoute(
     profile.maxBankRad >= Math.PI / 2 ||
     profile.maxClimbGradient <= 0 ||
     profile.minAltitudeM < 1 ||
-    profile.maxAltitudeM < profile.minAltitudeM
+    profile.maxAltitudeM < profile.minAltitudeM ||
+    (profile.bankResponseSec !== undefined &&
+      (!Number.isFinite(profile.bankResponseSec) ||
+        profile.bankResponseSec < 0 ||
+        profile.bankResponseSec > 3))
   )
     throw new Error("Invalid aircraft profile");
   if (spec.rawPoints.length > 1000)
     throw new Error("航路は1,000点以内にしてください。");
   if (!spec.rawPoints.every(finitePoint))
     throw new Error("航路に無効な座標があります。");
+  if (spec.generator) return compileGenerated(spec, profile);
   const notices: string[] = [];
   let raw = spec.rawPoints.filter(
     (p, i, all) => i === 0 || distance(p, all[i - 1]) >= 4,
@@ -247,5 +257,97 @@ export function compileRoute(
     notices,
     speedMps: profile.speedMps,
     maxBankRad: profile.maxBankRad,
+    bankResponseSec: profile.bankResponseSec ?? 0,
+  };
+}
+
+function compileGenerated(
+  spec: RouteSpec,
+  profile: AircraftProfile,
+): CompiledRoute {
+  const g = spec.generator!;
+  validateGenerator(g);
+  if (g.altitudeM < profile.minAltitudeM || g.altitudeM > profile.maxAltitudeM)
+    throw new Error("通過高度を機体の飛行できる範囲に収めてください。");
+  const limit = (9.81 * Math.tan(profile.maxBankRad)) / profile.speedMps ** 2;
+  if (Math.hypot(g.a.x - g.b.x, g.a.z - g.b.z) < 2.1 / limit)
+    throw new Error(
+      "この速度では折り返しが窮屈です。AとBを離すか、速度を下げてください。",
+    );
+  let width = g.widthM,
+    points = generatedPoints(g, width);
+  let maxCurve = Infinity;
+  for (let attempt = 0; attempt < 18; attempt++) {
+    points = generatedPoints(g, width);
+    maxCurve = Math.max(
+      ...points.map((p, i) =>
+        Math.abs(
+          curvature(
+            points[mod(i - 1, points.length)],
+            p,
+            points[(i + 1) % points.length],
+          ),
+        ),
+      ),
+    );
+    if (maxCurve <= limit) break;
+    width *= 1.06;
+  }
+  if (
+    maxCurve > limit ||
+    points.some((p) => Math.abs(p.x) > 6000 || Math.abs(p.z) > 6000)
+  )
+    throw new Error(
+      "旋回が空域に収まりません。変化を減らすか、2点の配置と速度を調整してください。",
+    );
+  // Scale the vertical wave as a whole so limiting altitude or climb does not
+  // introduce flat clips or move the two anchor heights.
+  const maxGradient = Math.max(
+    ...points.map((p, i) => {
+      const next = points[(i + 1) % points.length];
+      return Math.abs(next.y - p.y) / Math.hypot(next.x - p.x, next.z - p.z);
+    }),
+  );
+  const verticalScale = Math.min(
+    1,
+    (g.altitudeM - profile.minAltitudeM) / 40,
+    (profile.maxAltitudeM - g.altitudeM) / 40,
+    profile.maxClimbGradient / (maxGradient || 1),
+  );
+  points = points.map((p) => ({
+    ...p,
+    y: g.altitudeM + (p.y - g.altitudeM) * verticalScale,
+  }));
+  const sampled = resample(points);
+  const samples = sampled.points.map((position, i, all) => ({
+    sM: (i / all.length) * sampled.total,
+    position,
+    tangent: normalize(
+      sub(all[(i + 1) % all.length], all[mod(i - 1, all.length)]),
+    ),
+    curvature: curvature(
+      all[mod(i - 1, all.length)],
+      position,
+      all[(i + 1) % all.length],
+    ),
+  }));
+  return {
+    routeId: spec.id,
+    revision: spec.revision,
+    samples,
+    totalLengthM: sampled.total,
+    durationMs: (sampled.total / profile.speedMps) * 1000,
+    checksum: checksum({ generator: g, profile, width, verticalScale }),
+    speedMps: profile.speedMps,
+    maxBankRad: profile.maxBankRad,
+    bankResponseSec: profile.bankResponseSec ?? 0,
+    notices: [
+      ...(width > g.widthM + 1
+        ? ["AとBを保ち、機体が曲がれる幅まで回り込みを広げました。"]
+        : []),
+      ...(verticalScale < 1 && g.variation > 0
+        ? ["通過高度を保ち、高度と勾配に収まるよう上下のゆらぎを抑えました。"]
+        : []),
+    ],
   };
 }

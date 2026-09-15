@@ -67,6 +67,7 @@ export function RouteEditor({
           revision: e.spec.revision + 1,
           rawPoints: edit.points,
           closed: true,
+          flight: e.spec.flight,
         });
         onChange();
       } catch (error) {

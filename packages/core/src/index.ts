@@ -8,3 +8,4 @@ export * from "./recipe";
 export * from "./experience";
 export * from "./airspace";
 export * from "./tower";
+export * from "./workshop";

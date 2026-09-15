@@ -8,11 +8,14 @@ export interface RouteSpec {
   revision: number;
   rawPoints: Vec3[];
   closed: true;
+  generator?: RouteGenerator;
+  flight?: FlightSettings;
 }
 export interface AircraftProfile {
   id: "heavy_four_engine";
   speedMps: number;
   maxBankRad: number;
+  bankResponseSec?: number;
   maxClimbGradient: number;
   minAltitudeM: number;
   maxAltitudeM: number;
@@ -33,6 +36,7 @@ export interface CompiledRoute {
   notices: string[];
   speedMps: number;
   maxBankRad: number;
+  bankResponseSec?: number;
 }
 export type SessionPhase = "EDIT" | "COMPILE" | "FLY" | "ARRIVAL" | "INTERLAP";
 export interface EngineRecipe {
@@ -61,3 +65,4 @@ export interface FlightPose {
   bankRad: number;
   phase01: number;
 }
+import type { FlightSettings, RouteGenerator } from "./workshop";
