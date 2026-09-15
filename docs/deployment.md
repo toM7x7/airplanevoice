@@ -1,12 +1,14 @@
 # 公開先・クラウド構成・展示会の予備動作
 
-更新: 2026-09-15 / v0.3
+更新: 2026-09-15 / v0.5.0
 
 ## 試遊版の公開先
 
 GitHub Pagesで静的Webアプリの試遊版を配信する。独自ドメインは取得しない。**本番の配信・共有・DB・AI基盤は未決定**で、[本番環境の相談](production-options.md)でCloudflare、Vercel等と比較する。
 
 公開URL: [SOUND TRAILを試す](https://tom7x7.github.io/airplanevoice/)
+
+v0.5.0の1人用VR試作を公開。コミット`6b2b6ea`の[公開処理](https://github.com/toM7x7/airplanevoice/actions/runs/34926794170)・[CI](https://github.com/toM7x7/airplanevoice/actions/runs/34926794122)が成功。公開URLにIWERをテスト側から注入し、VR15項目と実時間の1機・3機の音声を確認した。配布アプリにエミュレーターは含めない。Quest 3での実機確認は[6項目](quest-vr.md)を残す。
 
 `.github/workflows/pages.yml` がmainへの変更を受け、テスト・ビルドを通してdistを公開する。3D描画と音は参加者のブラウザで動く。現段階の「クラウド」はWebアプリの配信であり、共有部屋やAIのクラウド処理はまだ接続していない。
 
