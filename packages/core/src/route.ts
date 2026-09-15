@@ -81,21 +81,36 @@ function curvature(a: Vec3, b: Vec3, c: Vec3): number {
 function resample(
   points: Vec3[],
   count = 512,
-): { points: Vec3[]; total: number } {
+): { points: Vec3[]; curvatures: number[]; total: number } {
   const lengths = [0];
   for (let i = 1; i <= points.length; i++)
     lengths.push(
       lengths[i - 1] + distance(points[i - 1], points[i % points.length]),
     );
   const total = lengths[lengths.length - 1];
+  // Keep curvature from the smooth source curve. Differentiating the linearly
+  // resampled polyline amplifies sub-segment errors into alternating roll,
+  // even on a perfect circle (768 source points -> 512 distance samples).
+  const sourceCurvatures = points.map((p, i) =>
+    curvature(
+      points[mod(i - 1, points.length)],
+      p,
+      points[(i + 1) % points.length],
+    ),
+  );
+  const curvatures: number[] = [];
   let index = 0;
   const result = Array.from({ length: count }, (_, i) => {
     const s = (total * i) / count;
     while (index < points.length - 1 && lengths[index + 1] < s) index++;
     const t = (s - lengths[index]) / (lengths[index + 1] - lengths[index] || 1);
+    curvatures.push(
+      sourceCurvatures[index] * (1 - t) +
+        sourceCurvatures[(index + 1) % points.length] * t,
+    );
     return lerp(points[index], points[(index + 1) % points.length], t);
   });
-  return { points: result, total };
+  return { points: result, curvatures, total };
 }
 
 export function compileRoute(
@@ -236,11 +251,7 @@ export function compileRoute(
     tangent: normalize(
       sub(all[(i + 1) % all.length], all[mod(i - 1, all.length)]),
     ),
-    curvature: curvature(
-      all[mod(i - 1, all.length)],
-      p,
-      all[(i + 1) % all.length],
-    ),
+    curvature: sampled.curvatures[i],
   }));
   return {
     routeId: spec.id,
@@ -249,6 +260,7 @@ export function compileRoute(
     totalLengthM: sampled.total,
     durationMs: (sampled.total / profile.speedMps) * 1000,
     checksum: checksum({
+      attitude: "source-curvature-v1",
       positions: sampled.points.map((p) =>
         [p.x, p.y, p.z].map((v) => Math.round(v * 1000)),
       ),
@@ -325,11 +337,7 @@ function compileGenerated(
     tangent: normalize(
       sub(all[(i + 1) % all.length], all[mod(i - 1, all.length)]),
     ),
-    curvature: curvature(
-      all[mod(i - 1, all.length)],
-      position,
-      all[(i + 1) % all.length],
-    ),
+    curvature: sampled.curvatures[i],
   }));
   return {
     routeId: spec.id,
@@ -337,7 +345,13 @@ function compileGenerated(
     samples,
     totalLengthM: sampled.total,
     durationMs: (sampled.total / profile.speedMps) * 1000,
-    checksum: checksum({ generator: g, profile, width, verticalScale }),
+    checksum: checksum({
+      attitude: "source-curvature-v1",
+      generator: g,
+      profile,
+      width,
+      verticalScale,
+    }),
     speedMps: profile.speedMps,
     maxBankRad: profile.maxBankRad,
     bankResponseSec: profile.bankResponseSec ?? 0,
