@@ -126,6 +126,21 @@ export function SkyTransfer({
       {error && <p role="alert">{error}</p>}
       {sky && (
         <dl className="transfer-summary">
+          {sky.show && (
+            <div>
+              <dt>演目</dt>
+              <dd>
+                {sky.show.title}
+                <br />
+                {sky.show.flights
+                  .map(
+                    (f, i) =>
+                      `ST-0${i + 1}: ${f.startSec}秒後 / ${f.recipe.aircraft.engineCount}基`,
+                  )
+                  .join(" · ")}
+              </dd>
+            </div>
+          )}
           <div>
             <dt>機体</dt>
             <dd>
@@ -144,9 +159,11 @@ export function SkyTransfer({
             <dt>飛ばし方</dt>
             <dd>
               {sky.airspace.aircraftCount}機 ·{" "}
-              {sky.airspace.spacingSec
-                ? `${sky.airspace.spacingSec}秒ずつ`
-                : "同時に"}{" "}
+              {sky.show
+                ? "各機の予定時刻"
+                : sky.airspace.spacingSec
+                  ? `${sky.airspace.spacingSec}秒ずつ`
+                  : "同時に"}{" "}
               · {sky.evolution.enabled ? "変化して周回" : "1周ずつ"}
             </dd>
           </div>

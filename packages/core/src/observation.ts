@@ -23,7 +23,8 @@ export function aircraftInfo(e: Experience, id: FlightId) {
         : flight.queue.remaining
           ? "tail"
           : "complete";
-  const visible = state === "flying" || (state === "preview" && id === "ST-01");
+  const visible =
+    state === "flying" || (state === "preview" && (id === "ST-01" || !!e.show));
   // Finished flights are invisible. Do not report their wrapped pose as a new lap.
   const pose = visible ? e.pose(id) : null;
   const heading = pose ? compassHeading(pose.tangent) : null;
@@ -32,7 +33,7 @@ export function aircraftInfo(e: Experience, id: FlightId) {
     state,
     paused: e.paused,
     visible,
-    speedMps: pose ? (flight?.route ?? e.route).speedMps : null,
+    speedMps: pose ? e.routeFor(id).speedMps : null,
     headingDeg: heading?.degrees ?? null,
     headingLabel: heading?.label ?? null,
     altitudeM: pose?.position.y ?? null,

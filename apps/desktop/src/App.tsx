@@ -25,7 +25,8 @@ import { AirspaceControls } from "./AirspaceControls";
 import { Workshop } from "./Workshop";
 import { AircraftInfo } from "./AircraftInfo";
 import { EvolutionControls } from "./EvolutionControls";
-import { FlightMap } from "./FlightMap";
+import { ObservationDeck } from "./ObservationDeck";
+import { ShowComposer, SHOW_DRAFT_KEY } from "./ShowComposer";
 import { VrRuntime } from "./vr";
 import { SkyTransfer } from "./SkyTransfer";
 import {
@@ -181,6 +182,8 @@ export function App() {
   const [help, setHelp] = useState(false);
   const [diagnostics, setDiagnostics] = useState(false);
   const [workshop, setWorkshop] = useState(false);
+  const [showEditor, setShowEditor] = useState(!!e.show);
+  const [composerRevision, setComposerRevision] = useState(0);
   const [offlineReady, setOfflineReady] = useState(false);
   const [online, setOnline] = useState(navigator.onLine);
   const [inspectedId, setInspectedId] = useState<FlightId | null>(null);
@@ -224,7 +227,8 @@ export function App() {
       localStorage.setItem(
         SKY_OPTIONS_KEY,
         JSON.stringify({
-          version: 1,
+          version: e.show ? 2 : 1,
+          ...(e.show ? { show: e.show } : {}),
           airspace: e.airspace,
           evolution: e.evolution,
           delayScale: delay,
@@ -240,6 +244,7 @@ export function App() {
     snapshot.airspace.spacingSec,
     snapshot.evolution.enabled,
     snapshot.evolution.amount,
+    snapshot.show,
     delay,
     observer,
   ]);
@@ -254,6 +259,8 @@ export function App() {
     setObserver(sky.observer);
     setInspectedId(null);
     setWorkshop(false);
+    setShowEditor(!!sky.show);
+    setComposerRevision((n) => n + 1);
     view.current = { yaw: 0, pitch: 0.32, zoom: false };
     setZoom(false);
     closeTransfer();
@@ -352,6 +359,13 @@ export function App() {
     audio.stop();
     e.reset();
     setWorkshop(false);
+    setShowEditor(false);
+    setComposerRevision((n) => n + 1);
+    try {
+      localStorage.removeItem(SHOW_DRAFT_KEY);
+    } catch {
+      /* Optional storage. */
+    }
     setInspectedId(null);
     setObserver("garden");
     setDelay(1.6);
@@ -373,7 +387,7 @@ export function App() {
       [
         JSON.stringify(
           {
-            version: "0.6.1",
+            version: "0.7.0",
             platform: vr.diagnostics.frames > 0 ? "webxr-standalone" : "web",
             route: e.spec,
             aircraftDesign: e.aircraftDesign,
@@ -444,7 +458,12 @@ export function App() {
   ]);
   useEffect(() => {
     e.onArrival = (arrival, now) =>
-      audio.play(arrival, now, e.recipe.lowFrequencyGain);
+      audio.play(
+        arrival,
+        now,
+        e.recipe.lowFrequencyGain,
+        e.designFor(arrival.flightId).engineCount,
+      );
     window.render_game_to_text = () =>
       JSON.stringify({
         ...e.getSnapshot(),
@@ -549,7 +568,7 @@ export function App() {
 
   return (
     <main
-      className={`app ${editing ? "is-editing" : "is-flying"} ${e.airspace.aircraftCount > 1 ? "has-fleet" : ""} ${editing && workshop ? "is-workshop" : ""}`}
+      className={`app ${editing ? "is-editing" : "is-flying"} ${e.airspace.aircraftCount > 1 ? "has-fleet" : ""} ${editing && (workshop || showEditor) ? "is-workshop" : ""}`}
     >
       <header className="topbar">
         <a className="brand" href="./" aria-label="音航跡 ホーム">
@@ -596,17 +615,38 @@ export function App() {
                 あとの音まで、待ってみる。
               </p>
             </div>
-            {editing && (
+            {editing && !showEditor && (
               <button
                 className="workshop-toggle"
                 aria-expanded={workshop}
-                onClick={() => setWorkshop(!workshop)}
+                onClick={() => {
+                  e.clearShow();
+                  setShowEditor(false);
+                  setWorkshop(!workshop);
+                  save();
+                }}
               >
                 {workshop ? "← 自由に線を描く" : "つくる実験室 →"}
               </button>
             )}
-            <AirspaceControls experience={e} />
-            <EvolutionControls experience={e} />
+            {editing && (
+              <button
+                className="workshop-toggle"
+                aria-expanded={showEditor}
+                onClick={() => {
+                  if (showEditor) {
+                    e.clearShow();
+                    save();
+                  }
+                  setShowEditor(!showEditor);
+                  setWorkshop(false);
+                }}
+              >
+                {showEditor ? "← 単体の航路へ" : "演目をつくる →"}
+              </button>
+            )}
+            {(!editing || !showEditor) && <AirspaceControls experience={e} />}
+            {(!editing || !showEditor) && <EvolutionControls experience={e} />}
             {editing && (
               <button
                 className="transfer-open secondary"
@@ -640,7 +680,18 @@ export function App() {
               {vrState.error && <p role="alert">{vrState.error}</p>}
             </section>
             {editing ? (
-              workshop ? (
+              showEditor ? (
+                <ShowComposer
+                  key={composerRevision}
+                  experience={e}
+                  onSave={save}
+                  onInspect={(id) => {
+                    lookAtAircraft(id);
+                    view.current.zoom = true;
+                    setZoom(true);
+                  }}
+                />
+              ) : workshop ? (
                 <Workshop
                   experience={e}
                   onSave={save}
@@ -763,7 +814,7 @@ export function App() {
                   <h2>{phaseLabel}</h2>
                 </div>
                 <div className="flight-diagram">
-                  <FlightMap experience={e} />
+                  <ObservationDeck experience={e} />
                 </div>
                 <p className="flight-thought">
                   {snapshot.phase === "COMPILE"
@@ -817,7 +868,7 @@ export function App() {
                 onClick={() => void play()}
               >
                 <Icon name="play" size={16} />
-                <span>この航路で飛ばす</span>
+                <span>{e.show ? "この演目で飛ばす" : "この航路で飛ばす"}</span>
                 <span className="keycap">↵</span>
               </button>
               <p className="start-note">
@@ -995,7 +1046,7 @@ export function App() {
         >
           音・表示の設定 <span>{diagnostics ? "−" : "+"}</span>
         </button>
-        <span className="version">WORKSHOP · v0.6.1</span>
+        <span className="version">WORKSHOP · v0.7.0</span>
       </footer>
       {transfer && (
         <SkyTransfer
@@ -1048,7 +1099,12 @@ export function App() {
                 step="0.1"
                 disabled={active}
                 value={delay}
-                onChange={(event) => setDelay(Number(event.target.value))}
+                onChange={(event) => {
+                  const value = Number(event.target.value);
+                  setDelay(value);
+                  e.recipe = { ...e.recipe, delayScale: value };
+                  e.notify();
+                }}
               />
             </label>
             <small>×1 は音速343 m/s。倍率は次の飛行に反映。</small>

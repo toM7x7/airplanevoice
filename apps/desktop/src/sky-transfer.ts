@@ -1,5 +1,7 @@
 import {
   compileRoute,
+  compileShow,
+  workshopSpec,
   finitePoint,
   generatedPoints,
   OBSERVERS,
@@ -11,10 +13,12 @@ import {
   type AircraftDesign,
   type AirspaceConfig,
   type EvolutionSettings,
+  type ShowRecipe,
 } from "../../../packages/core/src";
 
 export interface SkyRecipe {
-  version: 1;
+  version: 1 | 2;
+  show?: ShowRecipe;
   route: RouteSpec;
   aircraft: AircraftDesign;
   airspace: AirspaceConfig;
@@ -28,8 +32,11 @@ const MAX_CODE = 48000;
 const object = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === "object" && !Array.isArray(v);
 export function parseSky(value: unknown): SkyRecipe {
-  if (!object(value) || value.version !== 1)
+  if (!object(value) || ![1, 2].includes(value.version as number))
     throw new Error("この空の設定形式には対応していません。");
+  if (value.version === 1 && value.show !== undefined)
+    throw new Error("演目の共有には新しい設定形式が必要です。");
+  const show = value.version === 2 ? compileShow(value.show).recipe : undefined;
   const r = value.route;
   if (
     !object(r) ||
@@ -89,13 +96,16 @@ export function parseSky(value: unknown): SkyRecipe {
     ...(r.flight ? { flight: structuredClone(r.flight) } : {}),
   };
   compileRoute(route);
+  if (show && (a.aircraftCount !== show.flights.length || ev.enabled))
+    throw new Error("演目の機数と周回設定を確認してください。");
   return {
-    version: 1,
-    route,
-    aircraft: { ...value.aircraft },
+    version: value.version as 1 | 2,
+    ...(show ? { show } : {}),
+    route: show ? workshopSpec(show.flights[0].recipe, 1) : route,
+    aircraft: { ...(show?.flights[0].recipe.aircraft ?? value.aircraft) },
     airspace: {
       aircraftCount: a.aircraftCount,
-      spacingSec: a.spacingSec,
+      spacingSec: show ? 0 : a.spacingSec,
     } as AirspaceConfig,
     evolution: { enabled: ev.enabled, amount: ev.amount },
     delayScale: value.delayScale,
@@ -111,7 +121,8 @@ export function captureSky(
   )?.id ?? "garden",
 ): SkyRecipe {
   return parseSky({
-    version: 1,
+    version: e.show ? 2 : 1,
+    ...(e.show ? { show: e.show } : {}),
     route: e.spec,
     aircraft: e.aircraftDesign,
     airspace: e.airspace,
@@ -121,8 +132,15 @@ export function captureSky(
   });
 }
 export function skyOptions(sky: SkyRecipe) {
-  const { version, airspace, evolution, delayScale, observer } = sky;
-  return { version, airspace, evolution, delayScale, observer };
+  const { version, airspace, evolution, delayScale, observer, show } = sky;
+  return {
+    version,
+    airspace,
+    evolution,
+    delayScale,
+    observer,
+    ...(show ? { show } : {}),
+  };
 }
 export function applySky(e: Experience, input: SkyRecipe, remember = true) {
   if (!e.canEdit)
@@ -132,6 +150,7 @@ export function applySky(e: Experience, input: SkyRecipe, remember = true) {
   e.setAircraftDesign(sky.aircraft);
   e.setAirspace(sky.airspace);
   e.setEvolution(sky.evolution);
+  if (sky.show) e.applyShow(sky.show);
   e.setListener(OBSERVERS.find((o) => o.id === sky.observer)!.position);
   e.recipe = { ...e.recipe, delayScale: sky.delayScale };
   e.setMix("balanced");
@@ -178,11 +197,11 @@ export async function encodeSky(input: SkyRecipe): Promise<string> {
     .replace(/=+$/, "");
   if (code.length > MAX_CODE)
     throw new Error("URLに収まるように航路の点を減らしてください。");
-  return `1.${code}`;
+  return `${sky.version}.${code}`;
 }
 export async function decodeSky(code: string): Promise<SkyRecipe> {
   if (
-    !code.startsWith("1.") ||
+    !/^[12]\./.test(code) ||
     code.length > MAX_CODE + 2 ||
     !/^[A-Za-z0-9_-]+$/.test(code.slice(2))
   )
@@ -231,6 +250,8 @@ export async function decodeSky(code: string): Promise<SkyRecipe> {
         16,
       );
     }
+    if (!object(value) || String(value.version) !== code[0])
+      throw new Error("Version mismatch");
     return parseSky(value);
   } catch {
     throw new Error(

@@ -11,3 +11,4 @@ export * from "./tower";
 export * from "./workshop";
 export * from "./observation";
 export * from "./evolution";
+export * from "./show";

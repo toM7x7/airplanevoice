@@ -10,6 +10,7 @@ import {
   type SoundMixMode,
 } from "./airspace";
 import { flightPose } from "./flight";
+import { compileShow, type ShowRecipe } from "./show";
 import { distance } from "./math";
 import { TowerDirector, type TowerFact, type TowerCue } from "./tower";
 import {
@@ -72,6 +73,7 @@ export interface ExperienceSnapshot {
   towerEnabled: boolean;
   towerCue: TowerCue | null;
   aircraftDesign: AircraftDesign;
+  show: ShowRecipe | null;
   evolution: EvolutionSettings & {
     nextInSec: number | null;
     error: string | null;
@@ -105,6 +107,51 @@ export class Experience {
   flights: FlightPlan[] = [];
   tower = new TowerDirector();
   aircraftDesign: AircraftDesign = { ...DEFAULT_AIRCRAFT };
+  compiledShow: ReturnType<typeof compileShow> | null = null;
+  get show() {
+    return this.compiledShow?.recipe ?? null;
+  }
+  applyShow(input: unknown) {
+    if (!this.canEdit) return;
+    const compiled = compileShow(input);
+    this.compiledShow = compiled;
+    this.spec = workshopSpec(compiled.recipe.flights[0].recipe, 1);
+    this.route = compiled.flights[0].route;
+    this.aircraftDesign = { ...compiled.recipe.flights[0].recipe.aircraft };
+    this.airspace = {
+      aircraftCount: compiled.flights.length as 1 | 2 | 3,
+      spacingSec: 0,
+    };
+    this.history = [];
+    this.evolution = { ...this.evolution, enabled: false };
+    this.mixMode = "balanced";
+    if (!this.flightIds.includes(this.focusId)) this.focusId = "ST-01";
+    this.log("show_applied", {
+      title: compiled.recipe.title,
+      checksum: compiled.checksum,
+    });
+    this.notify();
+  }
+  clearShow() {
+    if (!this.canEdit || !this.compiledShow) return;
+    this.compiledShow = null;
+    this.airspace = { aircraftCount: 1, spacingSec: 8 };
+    this.focusId = "ST-01";
+    this.notify();
+  }
+  designFor(id: FlightId) {
+    return (
+      this.compiledShow?.flights.find((f) => f.id === id)?.recipe.aircraft ??
+      this.aircraftDesign
+    );
+  }
+  routeFor(id: FlightId) {
+    return (
+      this.flights.find((f) => f.id === id)?.route ??
+      this.compiledShow?.flights.find((f) => f.id === id)?.route ??
+      this.route
+    );
+  }
   evolution: EvolutionSettings = { enabled: false, amount: 0.65 };
   private evolutionBase: { spec: RouteSpec; route: CompiledRoute } | null =
     null;
@@ -140,6 +187,10 @@ export class Experience {
     return this.canEdit && this.history.length > 0;
   }
   setEvolution(settings: EvolutionSettings) {
+    if (this.show && settings.enabled)
+      throw new Error(
+        "演目は同じ予定で試演します。変化する周回は単体の航路で使えます。",
+      );
     if (
       typeof settings.enabled !== "boolean" ||
       !Number.isFinite(settings.amount) ||
@@ -158,6 +209,7 @@ export class Experience {
   setAircraftDesign(design: AircraftDesign) {
     if (!this.canEdit) return;
     validateAircraft(design);
+    this.compiledShow = null;
     this.aircraftDesign = { ...design };
     this.log("aircraft_design", { ...design });
     this.notify();
@@ -178,6 +230,7 @@ export class Experience {
     return AIRCRAFT.slice(0, this.airspace.aircraftCount).map((a) => a.id);
   }
   get durationMs() {
+    if (this.compiledShow) return this.compiledShow.durationMs;
     return (
       this.route.durationMs +
       (this.airspace.aircraftCount - 1) * this.airspace.spacingSec * 1000
@@ -188,6 +241,7 @@ export class Experience {
   }
   setAirspace(config: AirspaceConfig) {
     if (!this.canEdit) return;
+    if (this.show) return;
     if (!validAirspace(config))
       throw new Error("Invalid airspace configuration");
     this.airspace = { ...config };
@@ -215,6 +269,7 @@ export class Experience {
     if (!this.canEdit) return;
     // Compile first: errors preserve the last valid route and undo history.
     const compiled = compileRoute(spec);
+    this.compiledShow = null;
     if (remember) {
       this.history.push(structuredClone(this.spec));
       if (this.history.length > 30) this.history.shift();
@@ -277,13 +332,14 @@ export class Experience {
     }
     this.nextLapAtMs = null;
     this.lap = nextLap ? this.lap + 1 : 0;
-    this.recipe = selectRecipe(this.lap, delayScale);
+    this.recipe = selectRecipe(this.show ? 0 : this.lap, delayScale);
     this.startAtMs = this.nowMs + 2500;
     this.flights = buildAirspace(
       this.route,
       this.startAtMs,
       this.airspace,
       delayScale,
+      this.compiledShow?.flights,
     );
     this.tower.reset();
     this.fact({
@@ -291,6 +347,7 @@ export class Experience {
       atMs: this.nowMs,
       count: this.airspace.aircraftCount,
       spacingSec: this.airspace.spacingSec,
+      customSchedule: !!this.show,
     });
     this.tower.advance(this.nowMs, false);
     this.trails = [];
@@ -300,7 +357,7 @@ export class Experience {
     this.paused = false;
     this.log("flight_scheduled", {
       startAtMs: this.startAtMs,
-      checksum: this.route.checksum,
+      checksum: this.compiledShow?.checksum ?? this.route.checksum,
       recipe: this.recipe.id,
       durationMs: this.durationMs,
       flights: this.flights.map((f) => ({
@@ -336,6 +393,7 @@ export class Experience {
   }
   reset() {
     this.edit();
+    this.compiledShow = null;
     this.lap = 0;
     this.history = [];
     this.evolution = { enabled: false, amount: 0.65 };
@@ -472,9 +530,9 @@ export class Experience {
   pose(id: FlightId = "ST-01"): FlightPose {
     const flight = this.flights.find((f) => f.id === id);
     return flightPose(
-      flight?.route ?? this.route,
+      this.routeFor(id),
       this.phase === "EDIT"
-        ? this.route.durationMs * 0.22
+        ? this.routeFor(id).durationMs * 0.22
         : Math.max(0, this.nowMs - (flight?.startAtMs ?? this.startAtMs)),
     );
   }
@@ -500,7 +558,7 @@ export class Experience {
           1000
         : null,
       visibleTrailCount: this.trails.length,
-      checksum: this.route.checksum,
+      checksum: this.compiledShow?.checksum ?? this.route.checksum,
       durationMs: this.durationMs,
       airspace: { ...this.airspace },
       fleet: this.flights.map((f) => ({
@@ -523,6 +581,7 @@ export class Experience {
       towerEnabled: this.tower.enabled,
       towerCue: this.tower.cue,
       aircraftDesign: { ...this.aircraftDesign },
+      show: this.show,
       evolution: {
         ...this.evolution,
         nextInSec:

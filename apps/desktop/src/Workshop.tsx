@@ -1,6 +1,8 @@
 import { useState } from "react";
 import {
   DEFAULT_WORKSHOP,
+  AIRCRAFT_PATTERNS,
+  ROUTE_PATTERNS,
   parseWorkshop,
   type Experience,
   type WorkshopRecipe,
@@ -88,6 +90,23 @@ export function Workshop({
       {tab === "aircraft" && (
         <>
           <h2>形をいじる、空で見る。</h2>
+          <div className="pattern-grid" aria-label="機体のパターン">
+            {AIRCRAFT_PATTERNS.map((p) => (
+              <button
+                key={p.name}
+                onClick={() => {
+                  e.setAircraftDesign(p.aircraft);
+                  onInspect();
+                  onSave();
+                }}
+              >
+                {p.name}
+                <small>
+                  {p.aircraft.engineCount}基 · 翼 {p.aircraft.wingSpanM}m
+                </small>
+              </button>
+            ))}
+          </div>
           {(
             [
               ["bodyLengthM", "胴体の長さ", 50, 85],
@@ -133,13 +152,34 @@ export function Workshop({
             機体を近くで見る
           </button>
           <p className="workshop-note">
-            寸法と配置を変えて見比べます。音色は共通です。
+            パターンを出発点に、寸法と配置を調律。双発と四発で合成音の厚みも変わります。
           </p>
         </>
       )}
       {tab === "route" && (
         <>
           <h2>ここから、あそこへ。</h2>
+          <div className="pattern-grid" aria-label="航路のパターン">
+            {ROUTE_PATTERNS.map((p) => (
+              <button
+                key={p.name}
+                onClick={() => {
+                  const next: WorkshopRecipe = {
+                    version: 1,
+                    aircraft: e.aircraftDesign,
+                    route: structuredClone(p.route),
+                    flight: { ...p.flight },
+                  };
+                  if (apply(next)) setDraft(next);
+                }}
+              >
+                {p.name}
+                <small>
+                  {p.route.altitudeM}m · {p.flight.speedMps}m/s
+                </small>
+              </button>
+            ))}
+          </div>
           <p className="workshop-note">
             AとBを通る空中の往復航路。地図を押すか、数値で2地点を置けます。追加機は位置をずらして飛びます。
           </p>
@@ -337,7 +377,7 @@ export function Workshop({
   );
 }
 
-function AnchorMap({
+export function AnchorMap({
   generator: g,
   onChange,
   route,

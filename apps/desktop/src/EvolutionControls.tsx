@@ -6,6 +6,12 @@ export function EvolutionControls({
   experience: Experience;
 }) {
   const s = e.snapshot;
+  if (e.show)
+    return (
+      <p className="evolution-note">
+        演目は各機の予定どおりに1回ずつ試演。終わったら、同じ演目をもう一度飛ばせます。
+      </p>
+    );
   return (
     <section className="evolution-controls" aria-label="周回の変化">
       <label className="evolution-toggle">

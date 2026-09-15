@@ -423,6 +423,66 @@ try {
   );
   assert.deepEqual((await state()).listener, hill);
   record("Non-default observer returns unchanged after VR");
+  // Fresh page removes development time stepping before a real-time authored show.
+  await page.reload();
+  await page.getByRole("button", { name: "リセット", exact: true }).click();
+  await page
+    .getByRole("button", { name: "演目をつくる →", exact: true })
+    .click();
+  await page.getByRole("button", { name: "三つの高さ", exact: true }).click();
+  for (const id of ["ST-02", "ST-03"]) {
+    await page
+      .getByRole("button", { name: `${id}を編集`, exact: true })
+      .click();
+    await page
+      .getByRole("slider", { name: `${id}の開始時刻`, exact: true })
+      .fill("0");
+  }
+  const authored = (await state()).show;
+  await page.locator("#vr-enter").click();
+  await wait(() => JSON.parse(window.render_game_to_text()).vr.views === 2);
+  await button(750, 350);
+  assert.equal((await state()).inspection.id, "ST-03");
+  assert.equal(
+    (await state()).inspection.speedMps,
+    authored.flights[2].recipe.flight.speedMps,
+  );
+  record(
+    "Authored aircraft previews remain selectable with their own speed in stereo XR",
+  );
+  await button(250, 243);
+  await wait(
+    () => {
+      const s = JSON.parse(window.render_game_to_text());
+      return (
+        s.fleet.length === 3 &&
+        s.fleet.every((f) => f.state === "flying") &&
+        ["ST-01", "ST-02", "ST-03"].every(
+          (id) => s.audio.playedByFlight[id] > 2,
+        )
+      );
+    },
+    undefined,
+    45000,
+  );
+  s = await state();
+  assert.equal(s.vr.views, 2);
+  assert(new Set(s.fleet.map((f) => Math.round(f.pose.position.y))).size === 3);
+  assert.deepEqual(s.show, authored);
+  await aim(null, "ST-03");
+  await press();
+  assert.equal((await state()).inspection.id, "ST-03");
+  await page.screenshot({ path: `${out}/09-authored-show.png` });
+  record(
+    "Three independent routes and mixed two/four-engine aircraft start and emit audio in XR",
+  );
+  await page.evaluate(() => xrDevice.activeSession.end());
+  await wait(
+    () => JSON.parse(window.render_game_to_text()).vr.status === "ready",
+  );
+  assert((await state()).paused);
+  assert.deepEqual((await state()).show, authored);
+  record("Leaving XR preserves the authored show and pauses its local clock");
   s = await state();
   assert.deepEqual(errors, []);
   await fs.writeFile(

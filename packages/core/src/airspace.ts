@@ -1,6 +1,7 @@
 import { ArrivalQueue, createEmissions } from "./acoustics";
 import { add, checksum } from "./math";
 import type { CompiledRoute, SoundArrival } from "./types";
+import type { CompiledShowFlight } from "./show";
 
 export const AIRCRAFT = [
   { id: "ST-01", accent: "#205963", offset: { x: 0, y: 0, z: 0 } },
@@ -36,6 +37,7 @@ export function buildAirspace(
   startAtMs: number,
   config: AirspaceConfig,
   delayScale: number,
+  show?: CompiledShowFlight[],
 ): FlightPlan[] {
   if (!validAirspace(config) || !Number.isFinite(startAtMs))
     throw new Error("Invalid airspace configuration");
@@ -61,13 +63,16 @@ export function buildAirspace(
               position: add(sample.position, offset),
             })),
           };
-    const start = startAtMs + index * config.spacingSec * 1000;
+    const planned = show?.[index];
+    const flownRoute = planned?.route ?? translated;
+    const start =
+      startAtMs + (planned?.startSec ?? index * config.spacingSec) * 1000;
     return {
       id: aircraft.id,
       accent: aircraft.accent,
-      route: translated,
+      route: flownRoute,
       startAtMs: start,
-      queue: new ArrivalQueue(createEmissions(translated, start), delayScale),
+      queue: new ArrivalQueue(createEmissions(flownRoute, start), delayScale),
       started: false,
       ended: false,
       arrivedCount: 0,

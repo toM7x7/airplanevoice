@@ -8,6 +8,135 @@
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
 }
+.pattern-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+  margin: 12px 0;
+}
+.pattern-grid button {
+  text-align: left;
+  padding: 10px 12px;
+  border: 1px solid #cdd7ce;
+  border-radius: 5px;
+  background: #fafbf5;
+  color: #29443e;
+  cursor: pointer;
+}
+.pattern-grid button:hover {
+  background: #e8efe5;
+  border-color: #6f9588;
+}
+.pattern-grid small,
+.pass-list small {
+  display: block;
+  color: #6b7d73;
+  font-size: 11px;
+  margin-top: 4px;
+}
+.show-composer h2 {
+  font-size: 19px;
+  font-weight: 500;
+}
+.show-composer h3,
+.observation-deck h3 {
+  font-size: 14px;
+  font-weight: 600;
+}
+.show-field {
+  display: grid;
+  gap: 7px;
+  margin: 12px 0;
+  font-size: 12px;
+}
+.show-field input,
+.show-field select,
+.show-details textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px;
+  border: 1px solid #bdccbf;
+  background: #fdfef8;
+  color: #29443e;
+  border-radius: 4px;
+  font: inherit;
+}
+.show-flight-tabs {
+  margin-top: 18px;
+}
+.show-summary {
+  font-size: 12px;
+  line-height: 1.8;
+  padding: 10px 12px;
+  background: #e9eee4;
+  border-radius: 4px;
+}
+.show-details {
+  margin: 15px 0;
+  padding: 12px 0;
+  border-top: 1px solid #d5ded2;
+}
+.show-details summary {
+  cursor: pointer;
+  font-size: 12px;
+}
+.show-details[open] summary {
+  margin-bottom: 16px;
+}
+.show-details .secondary {
+  width: 100%;
+  margin: 6px 0;
+}
+.show-details textarea {
+  font:
+    11px/1.5 Consolas,
+    monospace;
+}
+.observation-deck {
+  margin-top: 20px;
+  padding-top: 12px;
+  border-top: 1px solid #d5ded2;
+}
+.observation-deck svg {
+  display: block;
+  width: 100%;
+}
+.observation-deck svg text {
+  font:
+    9px Consolas,
+    "Yu Gothic UI",
+    sans-serif;
+  fill: #546d60;
+}
+.observation-deck .segmented button {
+  font-size: 11px;
+  padding: 7px 3px;
+}
+.pass-list > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 0;
+  font-size: 11px;
+  border-bottom: 1px solid #d5ded2;
+}
+.pass-list span {
+  text-align: right;
+}
+.pass-list strong {
+  font-family: Consolas, monospace;
+  font-weight: normal;
+}
+.flight-diagram .observation-deck {
+  width: 100%;
+  text-align: left;
+}
+.flight-diagram .observation-deck > svg {
+  max-height: none;
+}
+.flight-sidebar .flight-diagram {
+  display: block;
+}
 .is-workshop .sidebar-heading {
   display: none;
 }

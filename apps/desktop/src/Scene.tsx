@@ -262,16 +262,20 @@ function World({
       if (!mesh) return;
       const f = e.flights[index];
       mesh.visible =
-        e.phase === "EDIT" ? index === 0 : !!f && f.started && !f.ended;
+        e.phase === "EDIT"
+          ? e.show
+            ? index < e.flightIds.length
+            : index === 0
+          : !!f && f.started && !f.ended;
       if (!mesh.visible) return;
       const pose = e.pose(AIRCRAFT[index].id);
+      const aircraftDesign = e.designFor(AIRCRAFT[index].id);
       mesh.position.set(pose.position.x, pose.position.y, pose.position.z);
       clearance.set(
         mesh.position.x,
         mesh.position.y,
         mesh.position.z,
-        Math.max(e.aircraftDesign.bodyLengthM, e.aircraftDesign.wingSpanM) *
-          0.6,
+        Math.max(aircraftDesign.bodyLengthM, aircraftDesign.wingSpanM) * 0.6,
       );
       temp.tangent.set(pose.tangent.x, pose.tangent.y, pose.tangent.z);
       temp.right.crossVectors(UP, temp.tangent).normalize();
@@ -297,10 +301,7 @@ function World({
           x: ((p.x + 1) * size.width) / 2,
           y: ((1 - p.y) * size.height) / 2,
           radius: clamp(
-            (Math.max(
-              e.aircraftDesign.bodyLengthM,
-              e.aircraftDesign.wingSpanM,
-            ) *
+            (Math.max(aircraftDesign.bodyLengthM, aircraftDesign.wingSpanM) *
               size.height) /
               (4 * Math.tan((fov * Math.PI) / 360) * distance),
             16,
@@ -332,7 +333,7 @@ function World({
       lineObject.computeLineDistances();
       checksum.current = e.route.checksum;
     }
-    if (design.current) design.current.visible = e.phase === "EDIT";
+    if (design.current) design.current.visible = e.phase === "EDIT" && !e.show;
     const position = trailGeometry.getAttribute(
       "position",
     ) as THREE.BufferAttribute;
@@ -405,7 +406,7 @@ function World({
             aircraft.current[index] = mesh;
           }}
         >
-          <Aircraft accent={a.accent} design={e.aircraftDesign} />
+          <Aircraft accent={a.accent} design={e.designFor(a.id)} />
         </group>
       ))}
       <primitive object={lineObject} ref={design} />

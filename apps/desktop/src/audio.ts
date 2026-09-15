@@ -4,6 +4,7 @@ import {
   type FlightId,
   type Vec3,
 } from "../../../packages/core/src";
+import { engineSignal } from "./engine-sound";
 
 export type OutputProfile = "speaker" | "headphones";
 const PROFILES = {
@@ -55,7 +56,7 @@ type Level = ReturnType<Meter["read"]>;
 export class AircraftAudio {
   context: AudioContext | null = null;
   private master: GainNode | null = null;
-  private buffer: AudioBuffer | null = null;
+  private buffers = new Map<2 | 4, AudioBuffer>();
   private presence: BiquadFilterNode | null = null;
   private profile: OutputProfile = "speaker";
   private outputMeter: Meter | null = null;
@@ -153,7 +154,7 @@ export class AircraftAudio {
       const limiter = this.context.createDynamicsCompressor();
       this.presence = this.context.createBiquadFilter();
       this.presence.type = "peaking";
-      this.presence.frequency.value = 850;
+      this.presence.frequency.value = 480;
       this.presence.Q.value = 0.65;
       this.presence.gain.value = PROFILES[this.profile].presenceDb;
       limiter.threshold.value = -16;
@@ -166,25 +167,15 @@ export class AircraftAudio {
         .connect(limiter)
         .connect(this.context.destination);
       this.outputMeter = meter(this.context, limiter);
-      const frames = this.context.sampleRate * 4;
-      this.buffer = this.context.createBuffer(
-        1,
-        frames,
-        this.context.sampleRate,
-      );
-      const channel = this.buffer.getChannelData(0);
-      let seed = 92821,
-        low = 0;
-      for (let i = 0; i < frames; i++) {
-        seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-        const noise = (seed / 0xffffffff) * 2 - 1;
-        low = low * 0.96 + noise * 0.04;
-        const t = i / this.context.sampleRate;
-        channel[i] =
-          low * 1.7 +
-          noise * 0.1 +
-          Math.sin(t * Math.PI * 2 * 61) * 0.07 +
-          Math.sin(t * Math.PI * 2 * 123) * 0.03;
+      for (const count of [2, 4] as const) {
+        const signal = engineSignal(this.context.sampleRate, count);
+        const buffer = this.context.createBuffer(
+          1,
+          signal.length,
+          this.context.sampleRate,
+        );
+        buffer.getChannelData(0).set(signal);
+        this.buffers.set(count, buffer);
       }
       this.setVolume(this.volume);
     }
@@ -229,10 +220,16 @@ export class AircraftAudio {
         }
       : null;
   }
-  play(arrival: FlightArrival, nowMs: number, lowGain: number) {
+  play(
+    arrival: FlightArrival,
+    nowMs: number,
+    lowGain: number,
+    engines: 2 | 4 = 4,
+  ) {
+    const buffer = this.buffers.get(engines);
     if (
       !this.context ||
-      !this.buffer ||
+      !buffer ||
       !this.master ||
       this.context.state !== "running"
     )
@@ -252,11 +249,11 @@ export class AircraftAudio {
     const ctx = this.context,
       time = ctx.currentTime;
     const source = ctx.createBufferSource();
-    source.buffer = this.buffer;
+    source.buffer = buffer;
     source.playbackRate.value = arrival.pitchRatio;
     const filter = ctx.createBiquadFilter();
     filter.type = "lowpass";
-    filter.frequency.value = clamp(2600 - arrival.distanceM * 0.55, 400, 2400);
+    filter.frequency.value = clamp(1900 - arrival.distanceM * 0.4, 450, 1800);
     const bass = ctx.createBiquadFilter();
     bass.type = "lowshelf";
     bass.frequency.value = 150;
@@ -316,6 +313,7 @@ export class AircraftAudio {
     this.busMeters.clear();
     this.buses.forEach((bus) => bus.disconnect());
     this.buses.clear();
+    this.buffers.clear();
     void this.context?.close();
   }
 }

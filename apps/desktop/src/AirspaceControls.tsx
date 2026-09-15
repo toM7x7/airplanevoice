@@ -16,7 +16,7 @@ export function AirspaceControls({
         {([1, 2, 3] as const).map((n) => (
           <button
             key={n}
-            disabled={!e.canEdit}
+            disabled={!e.canEdit || !!e.show}
             aria-pressed={airspace.aircraftCount === n}
             onClick={() => e.setAirspace({ ...airspace, aircraftCount: n })}
           >
@@ -26,24 +26,26 @@ export function AirspaceControls({
       </div>
       {airspace.aircraftCount > 1 && (
         <>
-          <label className="spacing-label">
-            飛び始める間隔
-            <select
-              aria-label="飛び始める間隔"
-              disabled={!e.canEdit}
-              value={airspace.spacingSec}
-              onChange={(event) =>
-                e.setAirspace({
-                  ...airspace,
-                  spacingSec: Number(event.target.value) as 0 | 8 | 16,
-                })
-              }
-            >
-              <option value={0}>同時に</option>
-              <option value={8}>8秒ずつ</option>
-              <option value={16}>16秒ずつ</option>
-            </select>
-          </label>
+          {!e.show && (
+            <label className="spacing-label">
+              飛び始める間隔
+              <select
+                aria-label="飛び始める間隔"
+                disabled={!e.canEdit}
+                value={airspace.spacingSec}
+                onChange={(event) =>
+                  e.setAirspace({
+                    ...airspace,
+                    spacingSec: Number(event.target.value) as 0 | 8 | 16,
+                  })
+                }
+              >
+                <option value={0}>同時に</option>
+                <option value={8}>8秒ずつ</option>
+                <option value={16}>16秒ずつ</option>
+              </select>
+            </label>
+          )}
           <div className="segmented listening-mode" aria-label="聴き方">
             <button
               aria-pressed={mixMode === "focus"}

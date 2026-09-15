@@ -379,7 +379,7 @@ export class VrRuntime {
         .sub(this.raycaster.ray.origin)
         .dot(this.raycaster.ray.direction);
       const radius = Math.max(
-        this.experience.aircraftDesign.wingSpanM / 2,
+        this.experience.designFor(id).wingSpanM / 2,
         along * 0.025,
       );
       if (
@@ -476,8 +476,8 @@ export class VrRuntime {
       this.marker.quaternion.copy(this.orientation);
       this.marker.scale.setScalar(
         Math.max(
-          this.experience.aircraftDesign.wingSpanM,
-          this.experience.aircraftDesign.bodyLengthM,
+          this.experience.designFor(info.id).wingSpanM,
+          this.experience.designFor(info.id).bodyLengthM,
         ) * 0.7,
       );
     }

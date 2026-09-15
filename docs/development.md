@@ -1,5 +1,13 @@
 # 開発と検証
 
+## v0.7.0の追加
+
+- `show.ts`は各機のWorkshopRecipeと開始秒をまとめて検証・コンパイル。Experienceの演目モードから既存のFlightPlan／ArrivalQueueへ接続する。通常の単体航路・自動変化は維持。
+- `ShowComposer`で機体別の作成、パターン選択、JSON保存・読込。`ObservationDeck`は各機の航路と耳の位置、最接近・音到来の予測、実際に届いた音の発音位置を表示する。
+- 演目用共有形式はversion 2、単体用はversion 1。プレフィックスと展開データの版一致を検証する。旧URLを維持し、受信・端末保存でも自動発進しない。
+- `engine-sound.ts`で双発／四発の素材を合成。素材のRMSは同じで音色を変える。グラフの機体別・最終出力の左右波形も別途検証する。
+- `tests/show.test.ts`、`tests/engine-sound.test.ts`、`node scripts/show-check.mjs`を追加。既存VR検証に個別演目のプレビュー・発進・選択・退出を追加。仕様・手順は[演目の設計](show-workshop.md)。
+
 ## v0.6.0の追加
 
 - `sky-transfer.ts`: 機体・RouteSpec・空域・周回・遅延倍率・観察席のversion 1形式。gzip＋base64urlをURL fragmentの`#sky=1.…`へ保存。サーバー、DB、認証は追加しない。

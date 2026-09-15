@@ -8,6 +8,7 @@ export interface TowerFact {
   flightId?: FlightId;
   count?: number;
   spacingSec?: number;
+  customSchedule?: boolean;
 }
 export interface TowerCue {
   text: string;
@@ -53,7 +54,7 @@ export class TowerDirector {
     const fact = this.pending.shift();
     if (!fact) return;
     const text = {
-      scheduled: `${fact.count}機の飛行を準備しました。${fact.count === 1 ? "まもなく開始します。" : fact.spacingSec === 0 ? "各機、同時に開始します。" : `${fact.spacingSec}秒ずつ間隔を空けます。`}`,
+      scheduled: `${fact.count}機の飛行を準備しました。${fact.customSchedule ? "組んだ演目の順に飛びます。" : fact.count === 1 ? "まもなく開始します。" : fact.spacingSec === 0 ? "各機、同時に開始します。" : `${fact.spacingSec}秒ずつ間隔を空けます。`}`,
       started: `${fact.flightId}、飛行を開始しました。`,
       "first-arrival": `${fact.flightId}の音が届き始めました。機体が通った場所からの響きです。`,
       ended: `${fact.flightId}、一周を終えました。残る音を待ちます。`,
