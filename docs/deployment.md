@@ -2,21 +2,21 @@
 
 更新: 2026-09-15 / v0.3
 
-## 現段階の公開先
+## 試遊版の公開先
 
-GitHub Pagesで静的Webアプリを配信する。独自ドメインは取得しない。
+GitHub Pagesで静的Webアプリの試遊版を配信する。独自ドメインは取得しない。**本番の配信・共有・DB・AI基盤は未決定**で、[本番環境の相談](production-options.md)でCloudflare、Vercel等と比較する。
 
-想定URL: `https://tom7x7.github.io/airplanevoice/`
+公開URL: [SOUND TRAILを試す](https://tom7x7.github.io/airplanevoice/)
 
 `.github/workflows/pages.yml` がmainへの変更を受け、テスト・ビルドを通してdistを公開する。3D描画と音は参加者のブラウザで動く。現段階の「クラウド」はWebアプリの配信であり、共有部屋やAIのクラウド処理はまだ接続していない。
 
-公開状態とURLはGitHub ActionsのPublish experience、リポジトリのPages設定、公開URLのブラウザ動作で確認する。URL表記は公開確認後にREADMEへ反映する。
+2026-09-15、[公開処理](https://github.com/toM7x7/airplanevoice/actions/runs/34920761566)と[CI](https://github.com/toM7x7/airplanevoice/actions/runs/34920761559)が成功。公開URLで起動、機体設定の変更、初回保存、通信遮断後の再読み込み、設定復元、実時間の飛行と音声ノードの再生、接続復帰を確認した。Quest実機や人による音の評価は別途必要。
 
 ## 通常構成の到達目標
 
 ```mermaid
 flowchart LR
-  CDN[Webアプリ配信: GitHub Pages] --> Q1[Quest / PC 1]
+  CDN[Webアプリ配信: 試遊版はGitHub Pages] --> Q1[Quest / PC 1]
   CDN --> Q2[Quest / PC 2]
   Q1 -. 今後 .-> R[共有セッションサーバー]
   Q2 -. 今後 .-> R
@@ -28,7 +28,7 @@ flowchart LR
 - AIサービス: 機体／航路／演目の提案と管制案内。APIキーはサーバー側に置く。
 - 各端末: 共通予定から飛行位置を算出し、自分の位置に届く音を計算する。
 
-GitHub Pagesは静的配信の担当。共有状態やAI処理のサーバーは追加が必要。配信URLを決めるために、AIモデルや共有基盤まで先に固定しない。
+現在のGitHub Pagesは試遊版の静的配信を担当する。共有状態やAI処理のサーバーは追加が必要。本番では配信先自体も比較し、試遊URLが決まったことを最終構成の決定とは扱わない。
 
 ## ローカルは予備手段
 

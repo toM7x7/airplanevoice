@@ -12,7 +12,8 @@ Original prompt: 空repo https://github.com/toM7x7/airplanevoice — 資料を�
 - develop-web-game指定クライアントも実行し、飛行状態・画像を確認。スキル側のmodule type注意のみ。配布ビルド成功、JS gzip約319KBで大きいチャンクの注意は継続。
 - 通常はクラウド接続、ローカルは予備という指示を反映。ローカルLLMは接続方法の設計のみ。既存モデル一覧の確認用に一時起動したOllamaの自分のプロセスは停止。モデル取得・推論・アプリへのAI接続は未実施。
 - 展示会マップの事前準備・当日実測・ブースへの飛行、展示会MCPと対話キャラの案を `docs/idea-notes.md` に保存。実装計画とは別。MCP案内ページの確認のみで設定・接続はしていない。
-- GitHub Pages用の公開ワークフローを用意。公開URLでの確認結果は、完了後に追記する。
+- GitHub Pagesに試遊版を公開: https://tom7x7.github.io/airplanevoice/ 。コミット951219e、公開処理34920761566・CI34920761559成功。公開URLでも初回保存・通信遮断後の再読み込み・設定復元・実時間の音声出力・復帰が合格。
+- 最新の相談を反映: Pagesは試遊版。本番基盤は未決定とし、`docs/production-options.md`にCloudflare/Vercel、DB・共有状態・利用集計・AIの費用要因を比較。VercelのWebSocketは現行公式ではベータ対応を確認。サービス移行、DB作成、計測送信、課金契約は未実施。
 - 人によるv0.3の操作・重さの感覚・音の評価、Quest実機、共有、AIは未検証。
 
 ## 2026-09-15 共有する空へ向けた第2段階 / v0.2

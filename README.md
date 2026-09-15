@@ -6,6 +6,8 @@
 
 通常はクラウド上のURLから入り、ローカル動作は予備手段にする方針です。複数Questで同じ空を共有する体験と管制官AIは、今後の開発段階です。
 
+**[試遊版を開く](https://tom7x7.github.io/airplanevoice/)** — GitHub Pagesで配信しています。本番基盤は未決定で、[保存・共有・費用を含めた比較](docs/production-options.md)を進めます。
+
 ## 起動
 
 Node.js 22.12以降を使用します。
