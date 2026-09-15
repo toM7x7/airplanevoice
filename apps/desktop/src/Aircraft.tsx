@@ -43,6 +43,7 @@ export function Aircraft({
   const details = useRef<THREE.Group>(null);
   const windows = useRef<THREE.InstancedMesh>(null);
   const worldPosition = useMemo(() => new THREE.Vector3(), []);
+  const viewerPosition = useMemo(() => new THREE.Vector3(), []);
   const lengthScale = design.bodyLengthM / 71,
     spanScale = design.wingSpanM / 64;
   const engines = [-1, 1].flatMap((side) =>
@@ -64,15 +65,16 @@ export function Aircraft({
     windows.current!.instanceMatrix.needsUpdate = true;
     windows.current!.computeBoundingSphere();
   }, []);
-  useFrame(({ camera }) => {
+  useFrame(({ camera, gl }) => {
     if (!details.current) return;
     details.current.getWorldPosition(worldPosition);
     const scale =
-      camera instanceof THREE.PerspectiveCamera
+      !gl.xr.isPresenting && camera instanceof THREE.PerspectiveCamera
         ? Math.tan((camera.fov * Math.PI) / 360) /
           Math.tan((29 * Math.PI) / 180)
         : 1;
-    const effectiveDistance = worldPosition.distanceTo(camera.position) * scale;
+    camera.getWorldPosition(viewerPosition);
+    const effectiveDistance = worldPosition.distanceTo(viewerPosition) * scale;
     details.current.visible =
       effectiveDistance < (details.current.visible ? 1700 : 1450);
   });

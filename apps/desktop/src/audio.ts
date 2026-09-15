@@ -116,6 +116,16 @@ export class AircraftAudio {
     l.upY.value = up.y;
     l.upZ.value = up.z;
   }
+  get listenerPose() {
+    const l = this.context?.listener;
+    return l
+      ? {
+          position: [l.positionX.value, l.positionY.value, l.positionZ.value],
+          forward: [l.forwardX.value, l.forwardY.value, l.forwardZ.value],
+          up: [l.upX.value, l.upY.value, l.upZ.value],
+        }
+      : null;
+  }
   play(arrival: FlightArrival, nowMs: number, lowGain: number) {
     if (
       !this.context ||

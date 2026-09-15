@@ -10,6 +10,7 @@ import {
 } from "../../../packages/core/src";
 import { Aircraft } from "./Aircraft";
 import type { AircraftAudio } from "./audio";
+import type { VrRuntime } from "./vr";
 
 export interface ViewState {
   yaw: number;
@@ -26,6 +27,8 @@ export interface AircraftTarget {
 interface SceneProps {
   experience: Experience;
   audio: AircraftAudio;
+  vr: VrRuntime;
+  soundOn: boolean;
   view: MutableRefObject<ViewState>;
   manual: MutableRefObject<boolean>;
   reduced: boolean;
@@ -113,6 +116,8 @@ function Landscape() {
 function World({
   experience: e,
   audio,
+  vr,
+  soundOn,
   view,
   manual,
   reduced,
@@ -127,7 +132,8 @@ function World({
   const design = useRef<THREE.LineLoop>(null);
   const trail = useRef<THREE.LineSegments>(null);
   const rings = useRef<THREE.InstancedMesh>(null);
-  const { camera, gl, size } = useThree();
+  const { camera, gl, size, scene } = useThree();
+  useEffect(() => vr.attach(gl, camera, scene), [vr, gl, camera, scene]);
   const geometry = useMemo(() => new THREE.BufferGeometry(), []);
   const trailGeometry = useMemo(() => {
     const g = new THREE.BufferGeometry();
@@ -194,21 +200,25 @@ function World({
     },
     [geometry, trailGeometry, designMaterial, trailMaterial],
   );
-  useFrame((_, dt) => {
-    if (!manual.current) e.advance(Math.min(dt * 1000, 250));
+  useFrame((_, dt, frame) => {
+    const immersive = vr.update(frame, dt);
     const v = view.current;
-    camera.position.set(e.listener.x, e.listener.y, e.listener.z);
-    camera.rotation.set(v.pitch, v.yaw, 0, "YXZ");
-    if (
-      camera instanceof THREE.PerspectiveCamera &&
-      camera.fov !== (v.zoom ? 30 : 58)
-    ) {
-      camera.fov = v.zoom ? 30 : 58;
-      camera.updateProjectionMatrix();
+    if (!immersive) {
+      camera.position.set(e.listener.x, e.listener.y, e.listener.z);
+      camera.rotation.set(v.pitch, v.yaw, 0, "YXZ");
+      if (
+        camera instanceof THREE.PerspectiveCamera &&
+        camera.fov !== (v.zoom ? 30 : 58)
+      ) {
+        camera.fov = v.zoom ? 30 : 58;
+        camera.updateProjectionMatrix();
+      }
+      camera.getWorldDirection(temp.forward);
+      temp.up.set(0, 1, 0).applyQuaternion(camera.quaternion);
+      audio.setListener(e.listener, temp.forward, temp.up);
     }
-    camera.getWorldDirection(temp.forward);
-    temp.up.set(0, 1, 0).applyQuaternion(camera.quaternion);
-    audio.setListener(e.listener, temp.forward, temp.up);
+    if (!manual.current && vr.canAdvance) e.advance(Math.min(dt * 1000, 250));
+    vr.draw(selectedId, soundOn);
     const visibleTargets: AircraftTarget[] = [];
     aircraft.current.forEach((mesh, index) => {
       if (!mesh) return;
@@ -228,7 +238,13 @@ function World({
         .multiply(temp.bank.setFromAxisAngle(Z, -pose.bankRad));
       temp.projected.copy(mesh.position).project(camera);
       const p = temp.projected;
-      if (Math.abs(p.x) <= 1 && Math.abs(p.y) <= 1 && p.z >= -1 && p.z <= 1) {
+      if (
+        !immersive &&
+        Math.abs(p.x) <= 1 &&
+        Math.abs(p.y) <= 1 &&
+        p.z >= -1 &&
+        p.z <= 1
+      ) {
         const distance = mesh.position.distanceTo(camera.position);
         const fov = camera instanceof THREE.PerspectiveCamera ? camera.fov : 58;
         visibleTargets.push({
@@ -398,6 +414,7 @@ export function Scene(props: SceneProps) {
       className="world"
       aria-label="飛行観察の3D画面。ドラッグで見回し、機体を押すと情報が開きます。"
       onPointerDown={(event) => {
+        if (props.vr.active) return;
         if (
           event.target instanceof HTMLCanvasElement &&
           event.button === 0 &&
@@ -472,7 +489,7 @@ export function Scene(props: SceneProps) {
     >
       <Canvas
         dpr={[1, 1.6]}
-        camera={{ fov: 58, near: 0.5, far: 24000 }}
+        camera={{ fov: 58, near: 0.1, far: 24000 }}
         gl={{ antialias: true, powerPreference: "high-performance" }}
         fallback={
           <div className="webgl-fallback">

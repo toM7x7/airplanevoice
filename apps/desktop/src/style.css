@@ -1728,3 +1728,19 @@ input[type="range"] {
     margin-bottom: 20px;
   }
 }
+/* Quest entry lives with the flight settings; immersive controls are in the scene. */
+.vr-entry {
+  margin: 16px 0;
+}
+.vr-entry .secondary {
+  width: 100%;
+}
+.vr-entry p {
+  margin: 7px 0 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: #53666a;
+}
+.vr-entry [role="alert"] {
+  color: #8b442f;
+}

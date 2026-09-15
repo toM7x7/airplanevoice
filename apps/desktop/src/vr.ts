@@ -1,0 +1,538 @@
+import * as THREE from "three";
+import {
+  aircraftInfo,
+  type Experience,
+  type FlightId,
+  type Vec3,
+} from "../../../packages/core/src";
+import type { AircraftAudio } from "./audio";
+
+type VrStatus =
+  "checking" | "unsupported" | "ready" | "entering" | "presenting";
+type Action = "primary" | "sound" | "exit" | FlightId;
+const BUTTONS: {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  action: Action;
+}[] = [
+  { x: 30, y: 205, w: 470, h: 78, action: "primary" },
+  { x: 524, y: 205, w: 470, h: 78, action: "sound" },
+  ...(["ST-01", "ST-02", "ST-03"] as FlightId[]).map((action, i) => ({
+    x: 30 + i * 332,
+    y: 315,
+    w: 300,
+    h: 62,
+    action,
+  })),
+  { x: 724, y: 426, w: 270, h: 60, action: "exit" },
+];
+
+/** Single-user, stationary observation. Metres and the original audio clock stay shared. */
+export class VrRuntime {
+  snapshot = { status: "checking" as VrStatus, error: "" };
+  private subscribers = new Set<() => void>();
+  subscribe = (fn: () => void) => {
+    this.subscribers.add(fn);
+    return () => {
+      this.subscribers.delete(fn);
+    };
+  };
+  private state(status: VrStatus, error = "") {
+    this.snapshot = { status, error };
+    this.subscribers.forEach((fn) => fn());
+  }
+  private renderer: THREE.WebGLRenderer | null = null;
+  private camera: THREE.Camera | null = null;
+  private scene: THREE.Scene | null = null;
+  private cameraParent: THREE.Object3D | null = null;
+  private session: XRSession | null = null;
+  private savedListener: Vec3 | null = null;
+  private rig = new THREE.Group();
+  private panel: THREE.Mesh<
+    THREE.PlaneGeometry,
+    THREE.MeshBasicMaterial
+  > | null = null;
+  private marker: THREE.Mesh | null = null;
+  private canvas: HTMLCanvasElement | null = null;
+  private ctx: CanvasRenderingContext2D | null = null;
+  private controls: THREE.Group[] = [];
+  private cleanups: (() => void)[] = [];
+  private raycaster = new THREE.Raycaster();
+  private position = new THREE.Vector3();
+  private orientation = new THREE.Quaternion();
+  private forward = new THREE.Vector3();
+  private up = new THREE.Vector3();
+  private scratch = new THREE.Vector3();
+  private panelPlaced = false;
+  private panelAt = 0;
+  private lastFrameAt = 0;
+  private frameIntervals: number[] = [];
+  private frames = 0;
+  private views = 0;
+  private selected: FlightId | null = null;
+  private tracked = false;
+  private soundOn = false;
+  onPrimary = () => {};
+  onSound = () => {};
+  onSelect = (_id: FlightId) => {};
+
+  constructor(
+    private experience: Experience,
+    private audio: AircraftAudio,
+  ) {}
+  get active() {
+    return this.session !== null || this.snapshot.status === "entering";
+  }
+
+  async checkSupport() {
+    if (this.active) return;
+    try {
+      const supported =
+        window.isSecureContext &&
+        !!navigator.xr &&
+        (await navigator.xr.isSessionSupported("immersive-vr"));
+      this.state(supported ? "ready" : "unsupported");
+    } catch {
+      this.state("unsupported");
+    }
+  }
+
+  attach(
+    renderer: THREE.WebGLRenderer,
+    camera: THREE.Camera,
+    scene: THREE.Scene,
+  ) {
+    this.renderer = renderer;
+    this.camera = camera;
+    this.scene = scene;
+    void this.checkSupport();
+    navigator.xr?.addEventListener("devicechange", this.deviceChange);
+    return () => {
+      navigator.xr?.removeEventListener("devicechange", this.deviceChange);
+      void this.exit();
+      this.finish();
+      this.renderer = null;
+      this.camera = null;
+      this.scene = null;
+    };
+  }
+  private deviceChange = () => {
+    void this.checkSupport();
+  };
+
+  async enter() {
+    if (
+      this.snapshot.status !== "ready" ||
+      !this.renderer ||
+      !this.camera ||
+      !navigator.xr
+    )
+      return;
+    this.state("entering");
+    try {
+      // Must run directly in the button's user gesture, before awaiting audio or anything else.
+      const session = await navigator.xr.requestSession("immersive-vr", {
+        requiredFeatures: ["local-floor"],
+      });
+      this.session = session;
+      session.addEventListener("end", this.finish);
+      this.savedListener = { ...this.experience.listener };
+      this.pause();
+      this.rig.position.set(
+        this.savedListener.x,
+        this.savedListener.y - 1.7,
+        this.savedListener.z,
+      );
+      this.cameraParent = this.camera.parent;
+      this.rig.add(this.camera);
+      this.scene!.add(this.rig);
+      this.rig.updateMatrixWorld(true);
+      this.createControls();
+      this.frames = 0;
+      this.views = 0;
+      this.lastFrameAt = 0;
+      this.frameIntervals = [];
+      this.panelPlaced = false;
+      this.panelAt = 0;
+      this.tracked = false;
+      session.addEventListener("visibilitychange", this.visibilityChange);
+      this.renderer.xr.setReferenceSpaceType("local-floor");
+      this.renderer.xr.setFramebufferScaleFactor(1);
+      this.renderer.xr.setFoveation(0.5);
+      await this.renderer.xr.setSession(session);
+      if (this.session !== session) return;
+      this.renderer.xr
+        .getReferenceSpace()
+        ?.addEventListener("reset", this.referenceReset);
+      this.state("presenting");
+    } catch (error) {
+      const session = this.session;
+      if (session) {
+        try {
+          await session.end();
+        } catch {
+          /* already ended */
+        }
+      }
+      this.finish();
+      const denied =
+        error instanceof DOMException &&
+        (error.name === "NotAllowedError" || error.name === "SecurityError");
+      this.state(
+        "ready",
+        denied
+          ? "VRへの入場が許可されませんでした。Questのブラウザで、もう一度試せます。"
+          : "VRを開始できませんでした。Questの床設定とブラウザを確認し、もう一度試してください。",
+      );
+    }
+  }
+  async exit() {
+    try {
+      await this.session?.end();
+    } catch {
+      this.state(
+        "presenting",
+        "VRを終了できませんでした。Questのシステムメニューから終了できます。",
+      );
+    }
+  }
+  private pause() {
+    if (this.experience.phase !== "EDIT" && !this.experience.paused)
+      this.experience.togglePause();
+    this.audio.stop();
+  }
+  private visibilityChange = () => {
+    if (this.session?.visibilityState !== "visible") {
+      this.pause();
+      this.lastFrameAt = 0;
+    }
+  };
+  private referenceReset = () => {
+    this.pause();
+    this.panelPlaced = false;
+  };
+  private finish = () => {
+    if (this.savedListener) {
+      this.pause();
+      this.experience.setListener(this.savedListener);
+      this.savedListener = null;
+    }
+    this.session?.removeEventListener("end", this.finish);
+    this.session?.removeEventListener(
+      "visibilitychange",
+      this.visibilityChange,
+    );
+    this.renderer?.xr
+      .getReferenceSpace()
+      ?.removeEventListener("reset", this.referenceReset);
+    this.cleanups.splice(0).forEach((fn) => fn());
+    if (this.camera?.parent === this.rig) {
+      this.rig.remove(this.camera);
+      this.cameraParent?.add(this.camera);
+    }
+    this.rig.removeFromParent();
+    this.session = null;
+    this.tracked = false;
+    this.panel = null;
+    this.marker = null;
+    this.canvas = null;
+    this.ctx = null;
+    this.controls = [];
+    if (this.snapshot.status !== "unsupported") this.state("ready");
+  };
+
+  private createControls() {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1024;
+    canvas.height = 512;
+    this.canvas = canvas;
+    this.ctx = canvas.getContext("2d")!;
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    const panel = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.4, 1.2),
+      new THREE.MeshBasicMaterial({ map: texture, toneMapped: false }),
+    );
+    this.panel = panel;
+    this.rig.add(panel);
+    const floor = new THREE.Mesh(
+      new THREE.CircleGeometry(1.2, 48),
+      new THREE.MeshBasicMaterial({
+        color: "#b4c7ab",
+        transparent: true,
+        opacity: 0.6,
+      }),
+    );
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = 0.01;
+    this.rig.add(floor);
+    const marker = new THREE.Mesh(
+      new THREE.RingGeometry(0.93, 1, 48),
+      new THREE.MeshBasicMaterial({
+        color: "#e9fbd0",
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        transparent: true,
+        opacity: 0.7,
+      }),
+    );
+    this.marker = marker;
+    this.scene!.add(marker);
+    const owned: THREE.Mesh[] = [panel, floor, marker];
+    for (let i = 0; i < 2; i++) {
+      const controller = this.renderer!.xr.getController(i);
+      this.rig.add(controller);
+      this.controls.push(controller);
+      const ray = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.003, 0.003, 3, 6),
+        new THREE.MeshBasicMaterial({ color: "#d9ffd3" }),
+      );
+      ray.rotation.x = Math.PI / 2;
+      ray.position.z = -1.5;
+      controller.add(ray);
+      owned.push(ray);
+      const select = () => this.select(controller);
+      const recall = () => {
+        this.panelPlaced = false;
+      };
+      controller.addEventListener("selectstart", select);
+      controller.addEventListener("squeezestart", recall);
+      this.cleanups.push(() => {
+        controller.removeEventListener("selectstart", select);
+        controller.removeEventListener("squeezestart", recall);
+        controller.removeFromParent();
+      });
+    }
+    this.cleanups.push(() => {
+      texture.dispose();
+      owned.forEach((mesh) => {
+        mesh.removeFromParent();
+        mesh.geometry.dispose();
+        (mesh.material as THREE.Material).dispose();
+      });
+    });
+  }
+
+  private select(controller: THREE.Group) {
+    if (
+      !this.tracked ||
+      !controller.visible ||
+      this.session?.visibilityState !== "visible"
+    )
+      return;
+    controller.updateWorldMatrix(true, false);
+    this.raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+    this.raycaster.ray.direction
+      .set(0, 0, -1)
+      .transformDirection(controller.matrixWorld);
+    if (this.panel) {
+      this.panel.updateWorldMatrix(true, false);
+      const hit = this.raycaster.intersectObject(this.panel)[0];
+      if (hit?.uv) {
+        const x = hit.uv.x * 1024,
+          y = (1 - hit.uv.y) * 512;
+        const button = BUTTONS.find(
+          (b) => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h,
+        );
+        if (button) this.act(button.action);
+        return;
+      }
+    }
+    let nearest: { id: FlightId; along: number } | null = null;
+    for (const id of this.experience.flightIds) {
+      if (!aircraftInfo(this.experience, id)?.visible) continue;
+      const p = this.experience.pose(id).position;
+      this.scratch.set(p.x, p.y, p.z);
+      const along = this.scratch
+        .clone()
+        .sub(this.raycaster.ray.origin)
+        .dot(this.raycaster.ray.direction);
+      const radius = Math.max(
+        this.experience.aircraftDesign.wingSpanM / 2,
+        along * 0.025,
+      );
+      if (
+        along > 0 &&
+        this.raycaster.ray.distanceSqToPoint(this.scratch) < radius * radius &&
+        (!nearest || along < nearest.along)
+      )
+        nearest = { id, along };
+    }
+    if (nearest) this.act(nearest.id);
+  }
+  private act(action: Action) {
+    if (action === "primary") this.onPrimary();
+    else if (action === "sound") this.onSound();
+    else if (action === "exit") void this.exit();
+    else if (this.experience.flightIds.includes(action)) {
+      this.selected = action;
+      this.onSelect(action);
+    }
+    this.panelAt = 0;
+  }
+
+  /** Called before simulation and audio. Use the centre head pose, not either eye's camera. */
+  update(frame: XRFrame | undefined, dt: number) {
+    if (!this.session || !frame || !this.renderer || !this.camera) return false;
+    const reference = this.renderer.xr.getReferenceSpace();
+    const pose = reference && frame.getViewerPose(reference);
+    this.tracked = !!pose && this.session.visibilityState === "visible";
+    if (!this.tracked || !pose) {
+      this.pause();
+      this.lastFrameAt = 0;
+      return true;
+    }
+    const { position, orientation } = pose.transform;
+    this.position
+      .set(position.x, position.y, position.z)
+      .add(this.rig.position);
+    this.orientation.set(
+      orientation.x,
+      orientation.y,
+      orientation.z,
+      orientation.w,
+    );
+    this.forward.set(0, 0, -1).applyQuaternion(this.orientation);
+    this.up.set(0, 1, 0).applyQuaternion(this.orientation);
+    this.experience.trackListener(this.position);
+    this.audio.setListener(this.position, this.forward, this.up);
+    this.rig.updateMatrixWorld(true);
+    if (this.camera instanceof THREE.PerspectiveCamera)
+      this.renderer.xr.updateCamera(this.camera);
+    this.frames++;
+    this.views = pose.views.length;
+    if (this.lastFrameAt && dt > 0) {
+      this.frameIntervals.push(dt * 1000);
+      if (this.frameIntervals.length > 600) this.frameIntervals.shift();
+    }
+    this.lastFrameAt = performance.now();
+    if (!this.panelPlaced && this.panel) {
+      const yaw = Math.atan2(-this.forward.x, -this.forward.z);
+      this.panel.rotation.set(0, yaw, 0);
+      this.panel.position.set(
+        -Math.sin(yaw) * 2.8 + position.x,
+        Math.max(0.75, position.y - 0.45),
+        -Math.cos(yaw) * 2.8 + position.z,
+      );
+      this.panelPlaced = true;
+    }
+    return true;
+  }
+  get canAdvance() {
+    return !this.active || this.tracked;
+  }
+  draw(selected: FlightId | null, soundOn: boolean) {
+    this.selected = selected;
+    this.soundOn = soundOn;
+    if (!this.session || !this.panel || !this.ctx || !this.marker) return;
+    const info = selected ? aircraftInfo(this.experience, selected) : null;
+    this.marker.visible = !!info?.visible;
+    if (info?.visible) {
+      const p = this.experience.pose(info.id).position;
+      this.marker.position.set(p.x, p.y, p.z);
+      this.marker.quaternion.copy(this.orientation);
+      this.marker.scale.setScalar(
+        Math.max(
+          this.experience.aircraftDesign.wingSpanM,
+          this.experience.aircraftDesign.bodyLengthM,
+        ) * 0.7,
+      );
+    }
+    if (performance.now() - this.panelAt < 200) return;
+    this.panelAt = performance.now();
+    const ctx = this.ctx,
+      e = this.experience;
+    ctx.fillStyle = "#132e31";
+    ctx.fillRect(0, 0, 1024, 512);
+    ctx.fillStyle = "#eaf4db";
+    ctx.font = "bold 34px sans-serif";
+    ctx.fillText("音航跡  /  空を見上げて、音を待つ", 30, 52);
+    ctx.font = "26px sans-serif";
+    const status = e.paused
+      ? "ひと休み中"
+      : e.phase === "EDIT"
+        ? "準備できたら、飛ばしてみよう"
+        : e.phase === "COMPILE"
+          ? "まもなく飛行開始"
+          : e.phase === "INTERLAP"
+            ? e.evolution.enabled
+              ? "次の空を待っています"
+              : "もう一周、眺められます"
+            : "姿は先へ。音はあとから。";
+    ctx.fillText(status, 30, 100);
+    const detail = info?.visible
+      ? `${info.id}   ${Math.round(info.speedMps!)} m/s   ${info.headingLabel} ${Math.round(info.headingDeg!)}°   距離 ${Math.round(info.distanceM!)} m`
+      : info
+        ? `${info.id}  ${info.state === "waiting" ? "飛行開始を待っています" : "飛行を終えました"}`
+        : "機体を指してトリガーで選択 → 速度・方向";
+    ctx.fillStyle = "#b9d6d0";
+    ctx.fillText(detail, 30, 152);
+    for (const b of BUTTONS) {
+      const isPlane = b.action.startsWith("ST-");
+      const enabled = !isPlane || e.flightIds.includes(b.action as FlightId);
+      ctx.fillStyle = !enabled
+        ? "#1c373a"
+        : b.action === selected
+          ? "#538079"
+          : "#36585b";
+      ctx.fillRect(b.x, b.y, b.w, b.h);
+      ctx.fillStyle = enabled ? "#f4f6ea" : "#6b8583";
+      ctx.font = "bold 28px sans-serif";
+      const primary = e.paused
+        ? "飛行を再開"
+        : e.phase === "EDIT"
+          ? "この航路で飛ばす"
+          : e.phase === "INTERLAP" && !e.evolution.enabled
+            ? "もう一周、眺める"
+            : "ひと休み";
+      const label =
+        b.action === "primary"
+          ? primary
+          : b.action === "sound"
+            ? soundOn
+              ? "音をオフ"
+              : "音をオン"
+            : b.action === "exit"
+              ? "VRを終了"
+              : b.action;
+      ctx.fillText(label, b.x + 22, b.y + b.h / 2 + 10);
+    }
+    ctx.fillStyle = "#b9d6d0";
+    ctx.font = "22px sans-serif";
+    ctx.fillText("トリガー：選ぶ  /  グリップ：操作盤を呼ぶ", 30, 429);
+    ctx.fillText("地上の観察席・1人用VR", 30, 474);
+    this.panel.material.map!.needsUpdate = true;
+  }
+
+  get diagnostics() {
+    const sorted = [...this.frameIntervals].sort((a, b) => a - b);
+    const panel = this.panel;
+    panel?.updateWorldMatrix(true, false);
+    return {
+      ...this.snapshot,
+      frames: this.frames,
+      views: this.views,
+      tracked: this.tracked,
+      visibility: this.session?.visibilityState ?? null,
+      inputSources: this.session?.inputSources.length ?? 0,
+      head: this.session
+        ? {
+            position: this.position.toArray(),
+            forward: this.forward.toArray(),
+            up: this.up.toArray(),
+          }
+        : null,
+      origin: this.rig.position.toArray(),
+      sampleFrames: sorted.length,
+      frameMsP50: sorted[Math.floor(sorted.length * 0.5)] ?? null,
+      frameMsP95: sorted[Math.floor(sorted.length * 0.95)] ?? null,
+      panel: panel
+        ? { matrix: panel.matrixWorld.toArray(), width: 2.4, height: 1.2 }
+        : null,
+      selected: this.selected,
+      soundOn: this.soundOn,
+    };
+  }
+}

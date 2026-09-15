@@ -26,6 +26,7 @@ import { Workshop } from "./Workshop";
 import { AircraftInfo } from "./AircraftInfo";
 import { EvolutionControls } from "./EvolutionControls";
 import { FlightMap } from "./FlightMap";
+import { VrRuntime } from "./vr";
 
 function Icon({
   name,
@@ -122,6 +123,8 @@ function loadExperience() {
 export function App() {
   const [e] = useState(loadExperience);
   const [audio] = useState(() => new AircraftAudio());
+  const [vr] = useState(() => new VrRuntime(e, audio));
+  const vrState = useSyncExternalStore(vr.subscribe, () => vr.snapshot);
   const snapshot = useSyncExternalStore(e.subscribe, () => e.snapshot);
   const [muted, setMuted] = useState(false);
   const [audioReady, setAudioReady] = useState(false);
@@ -220,6 +223,23 @@ export function App() {
     setMuted(!muted);
     audio.setMuted(!muted);
   }
+  vr.onPrimary = () => {
+    if (e.paused) pause();
+    else if (
+      e.phase === "EDIT" ||
+      (e.phase === "INTERLAP" && !e.evolution.enabled)
+    )
+      void play(e.phase === "INTERLAP");
+    else pause();
+  };
+  vr.onSound = () => {
+    void sound();
+  };
+  vr.onSelect = setInspectedId;
+  function enterVr() {
+    void vr.enter();
+    void enableAudio();
+  }
   function reset() {
     audio.stop();
     e.reset();
@@ -245,7 +265,7 @@ export function App() {
       [
         JSON.stringify(
           {
-            version: "0.4.0",
+            version: "0.5.0",
             platform: "desktop-local",
             route: e.spec,
             aircraftDesign: e.aircraftDesign,
@@ -263,6 +283,7 @@ export function App() {
               playedByFlight: audio.playedByFlight,
             },
             events: e.logs,
+            vr: vr.diagnostics,
           },
           null,
           2,
@@ -333,8 +354,10 @@ export function App() {
           playedByFlight: audio.playedByFlight,
           mixGains: audio.mixGains,
           busLevels: audio.busLevels,
+          listener: audio.listenerPose,
         },
         render: window.__soundTrailRender,
+        vr: vr.diagnostics,
         view: view.current,
         offline: { ready: offlineReady, online },
         inspection: inspectedId ? aircraftInfo(e, inspectedId) : null,
@@ -352,10 +375,10 @@ export function App() {
           requestAnimationFrame(() => resolve()),
         );
       };
-  }, [e, audio, muted, offlineReady, online, inspectedId]);
+  }, [e, audio, vr, muted, offlineReady, online, inspectedId]);
   useEffect(() => {
     function onHidden() {
-      if (document.hidden && e.phase !== "EDIT" && !e.paused) {
+      if (document.hidden && !vr.active && e.phase !== "EDIT" && !e.paused) {
         e.togglePause();
         audio.stop();
       }
@@ -366,9 +389,10 @@ export function App() {
       audio.dispose();
       if (messageTimer.current) clearTimeout(messageTimer.current);
     };
-  }, [e, audio]);
+  }, [e, audio, vr]);
   useEffect(() => {
     function key(event: KeyboardEvent) {
+      if (vr.active) return;
       if (event.key === "Escape" && inspectedId && !help) {
         event.preventDefault();
         setInspectedId(null);
@@ -466,6 +490,30 @@ export function App() {
             )}
             <AirspaceControls experience={e} />
             <EvolutionControls experience={e} />
+            <section className="vr-entry" aria-label="QuestでのVR体験">
+              <button
+                id="vr-enter"
+                className="secondary"
+                disabled={
+                  vrState.status !== "ready" && vrState.status !== "presenting"
+                }
+                onClick={() =>
+                  vrState.status === "presenting" ? void vr.exit() : enterVr()
+                }
+              >
+                {vrState.status === "presenting"
+                  ? "VRを終了"
+                  : vrState.status === "entering"
+                    ? "VRに入っています…"
+                    : "VRで空に立つ"}
+              </button>
+              <p>
+                {vrState.status === "unsupported"
+                  ? "QuestのブラウザでこのURLを開くと、VRで試せます。"
+                  : "1人用VR試作 · コントローラーで選択・開始"}
+              </p>
+              {vrState.error && <p role="alert">{vrState.error}</p>}
+            </section>
             {editing ? (
               workshop ? (
                 <Workshop
@@ -663,6 +711,8 @@ export function App() {
             <Scene
               experience={e}
               audio={audio}
+              vr={vr}
+              soundOn={audioReady && !muted}
               view={view}
               manual={manual}
               reduced={reduced}
@@ -818,7 +868,7 @@ export function App() {
         >
           音・表示の設定 <span>{diagnostics ? "−" : "+"}</span>
         </button>
-        <span className="version">WORKSHOP · v0.4.0</span>
+        <span className="version">WORKSHOP · v0.5.0</span>
       </footer>
       {diagnostics && (
         <section className="settings" aria-label="音と表示の設定">
@@ -877,9 +927,11 @@ export function App() {
               <dd>{snapshot.arrivedCount}</dd>
               <dt>経路チェックサム</dt>
               <dd>{snapshot.checksum}</dd>
+              <dt>直近VRのフレーム間隔 p95</dt>
+              <dd>{vr.diagnostics.frameMsP95?.toFixed(1) ?? "—"} ms</dd>
             </dl>
             <p>
-              この版は一人用の試作です。最大3機で聴き比べられます。管制字幕は定型案内で、AIは未接続です。Questでの共有は今後の段階です。
+              この版はPC・Questで一人用の試作です。最大3機で聴き比べられます。管制字幕はPC上の定型案内で、AIは未接続です。Quest実機の快適性・複数端末での共有は未確認です。
             </p>
             <p>
               {offlineReady
@@ -927,6 +979,9 @@ export function App() {
             </ol>
             <p className="help-keys">
               Enter 飛行開始 · Space ひと休み · Esc 編集へ · F 全画面
+            </p>
+            <p>
+              Questでは「VRで空に立つ」から入場。操作盤や機体を指してトリガーで選びます。グリップで操作盤を正面に呼べます。ヘッドセットを外した後は、操作盤から飛行を再開します。
             </p>
             <button
               className="primary"

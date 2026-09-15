@@ -355,6 +355,13 @@ export class Experience {
     this.log("observer_changed", { position });
     this.notify();
   }
+  // Tracking does not create a log or React notification for every XR frame.
+  trackListener(position: Vec3) {
+    if (![position.x, position.y, position.z].every(Number.isFinite)) return;
+    this.listener.x = position.x;
+    this.listener.y = position.y;
+    this.listener.z = position.z;
+  }
   togglePause() {
     if (this.phase === "EDIT") return;
     this.paused = !this.paused;

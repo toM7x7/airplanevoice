@@ -1,6 +1,7 @@
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
+const { version } = JSON.parse(await fs.readFile("package.json", "utf8"));
 const url = process.env.SOUND_TRAIL_URL ?? "http://127.0.0.1:4173/";
 const browser = await chromium.launch({
   headless: true,
@@ -96,7 +97,7 @@ try {
   assert.equal(state.offline.online, false);
   assert.equal(
     await page.locator(".version").textContent(),
-    "WORKSHOP · v0.4.0",
+    `WORKSHOP · v${version}`,
   );
   await fs.mkdir("output/workshop", { recursive: true });
   await page.screenshot({ path: "output/workshop/06-offline.png" });

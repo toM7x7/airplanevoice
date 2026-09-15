@@ -1,0 +1,338 @@
+import { chromium } from "playwright";
+import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+
+// IWER is injected by the test only. It is never imported by the shipped app.
+const url = process.env.TEST_URL || "http://127.0.0.1:5173/";
+const out = process.env.VR_OUTPUT || "output/vr";
+await fs.mkdir(out, { recursive: true });
+const browser = await chromium.launch({
+  headless: true,
+  args: ["--use-gl=angle", "--use-angle=swiftshader"],
+});
+const errors = [];
+const checks = [];
+const record = (name) => {
+  checks.push(name);
+  console.log(`OK ${name}`);
+};
+const emulation = await fs.readFile(
+  "node_modules/iwer/build/iwer.min.js",
+  "utf8",
+);
+let context;
+try {
+  context = await browser.newContext({
+    viewport: { width: 1366, height: 768 },
+  });
+  let page = await context.newPage();
+  await page.goto(url);
+  await page.waitForFunction(
+    () =>
+      window.render_game_to_text &&
+      JSON.parse(window.render_game_to_text()).vr.status === "unsupported",
+  );
+  assert(await page.locator("#vr-enter").isDisabled());
+  assert(await page.locator("#start-btn").isEnabled());
+  await page.screenshot({ path: `${out}/01-desktop.png` });
+  record("Unsupported browser retains PC flight controls");
+  await context.close();
+
+  context = await browser.newContext({
+    viewport: { width: 1366, height: 768 },
+  });
+  await context.addInitScript({
+    content: `${emulation}\nwindow.xrDevice = new IWER.XRDevice(IWER.metaQuest3, {stereoEnabled: true});
+    xrDevice.installRuntime({forceInstall:true, polyfillLayers:false});
+    xrDevice.controlMode = 'programmatic';
+    xrDevice.position.set(0, 1.65, 0);`,
+  });
+  page = await context.newPage();
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("console", (msg) => {
+    if (msg.type() === "error") errors.push(msg.text());
+  });
+  const state = () =>
+    page.evaluate(() => JSON.parse(window.render_game_to_text()));
+  const wait = (predicate, arg, timeout = 15000) =>
+    page.waitForFunction(predicate, arg, { timeout });
+  const press = async (id = "trigger") => {
+    await page.evaluate(
+      (id) => xrDevice.controllers.right.updateButtonValue(id, 1),
+      id,
+    );
+    await page.waitForTimeout(160);
+    await page.evaluate(
+      (id) => xrDevice.controllers.right.updateButtonValue(id, 0),
+      id,
+    );
+    await page.waitForTimeout(160);
+  };
+  const aim = async (world) => {
+    const s = await state();
+    await page.evaluate(
+      ({ world, origin }) => {
+        const c = xrDevice.controllers.right;
+        c.position.set(0.25, 1.3, -0.2);
+        const d = world.map((n, i) => n - origin[i] - [0.25, 1.3, -0.2][i]);
+        const length = Math.hypot(...d),
+          [x, y, z] = d.map((n) => n / length);
+        const norm = Math.hypot(y, -x, 1 - z);
+        c.quaternion.set(y / norm, -x / norm, 0, (1 - z) / norm);
+      },
+      { world, origin: s.vr.origin },
+    );
+    await page.waitForTimeout(180);
+  };
+  const button = async (x, y) => {
+    const { panel } = (await state()).vr;
+    const px = (x / 1024 - 0.5) * panel.width,
+      py = (0.5 - y / 512) * panel.height,
+      m = panel.matrix;
+    await aim([
+      m[0] * px + m[4] * py + m[12],
+      m[1] * px + m[5] * py + m[13],
+      m[2] * px + m[6] * py + m[14],
+    ]);
+    await press();
+  };
+  await page.goto(url);
+  await wait(
+    () =>
+      window.render_game_to_text &&
+      JSON.parse(window.render_game_to_text()).vr.status === "ready",
+  );
+  await page.evaluate(() => {
+    window.originalRequest = navigator.xr.requestSession.bind(navigator.xr);
+    navigator.xr.requestSession = () =>
+      Promise.reject(new DOMException("Test denial", "NotAllowedError"));
+  });
+  await page.locator("#vr-enter").click();
+  await wait(() =>
+    JSON.parse(window.render_game_to_text()).vr.error.includes("許可"),
+  );
+  assert.equal((await state()).phase, "EDIT");
+  await page.evaluate(() => {
+    navigator.xr.requestSession = window.originalRequest;
+  });
+  record("Denied entry is recoverable and preserves editing");
+
+  await page.evaluate(() => {
+    navigator.xr.requestSession = async (...args) => {
+      const session = await window.originalRequest(...args);
+      session.requestReferenceSpace = () =>
+        Promise.reject(
+          new DOMException("Test floor failure", "NotSupportedError"),
+        );
+      return session;
+    };
+  });
+  await page.locator("#vr-enter").click();
+  await wait(() =>
+    JSON.parse(window.render_game_to_text()).vr.error.includes("床設定"),
+  );
+  assert.equal((await state()).phase, "EDIT");
+  assert.deepEqual((await state()).listener, { x: 0, y: 1.7, z: 0 });
+  await page.evaluate(() => {
+    navigator.xr.requestSession = window.originalRequest;
+  });
+  record("Failure after session creation cleans up and allows retry");
+
+  await page.locator("#vr-enter").click();
+  await wait(() => JSON.parse(window.render_game_to_text()).vr.frames > 12);
+  let s = await state();
+  assert.equal(s.vr.status, "presenting");
+  assert.equal(s.vr.views, 2);
+  assert.equal(s.vr.inputSources, 2);
+  assert(Math.abs(s.listener.y - 1.65) < 0.01);
+  assert(s.vr.tracked);
+  await page.screenshot({ path: `${out}/02-stereo-entry.png` });
+  record("Quest 3 emulation renders two eyes, floor height and controllers");
+
+  await page.evaluate(() => {
+    xrDevice.position.set(0.35, 1.2, -0.4);
+    xrDevice.quaternion.set(0, Math.sin(Math.PI / 4), 0, Math.cos(Math.PI / 4));
+  });
+  await wait(() => JSON.parse(window.render_game_to_text()).listener.x > 0.34);
+  s = await state();
+  assert(Math.abs(s.listener.y - 1.2) < 0.01);
+  assert(Math.abs(s.listener.z + 0.4) < 0.01);
+  s.vr.head.position.forEach((n, i) =>
+    assert(Math.abs(n - s.audio.listener.position[i]) < 0.001),
+  );
+  s.vr.head.forward.forEach((n, i) =>
+    assert(Math.abs(n - s.audio.listener.forward[i]) < 0.001),
+  );
+  assert(s.audio.listener.forward[0] < -0.99);
+  assert(Math.abs(s.audio.listener.forward[2]) < 0.01);
+  record(
+    "Centre head translation and 90-degree turn reach real AudioListener parameters",
+  );
+
+  await press("squeeze");
+  s = await state();
+  assert(s.vr.panel.matrix[12] < -2);
+  record("Grip recalls a world-anchored panel in the new viewing direction");
+  // Return forward for readable screenshots and deterministic pointing.
+  await page.evaluate(() => {
+    xrDevice.position.set(0, 1.65, 0);
+    xrDevice.quaternion.set(0, 0, 0, 1);
+  });
+  await press("squeeze");
+  await button(240, 350);
+  assert.equal((await state()).inspection.id, "ST-01");
+  record("Spatial aircraft button opens speed and heading information");
+  await button(250, 243);
+  await wait(() => JSON.parse(window.render_game_to_text()).phase !== "EDIT");
+  await wait(
+    () => JSON.parse(window.render_game_to_text()).audio.played > 0,
+    undefined,
+    45000,
+  );
+  s = await state();
+  assert.equal(s.audio.state, "running");
+  assert.equal(s.phase, "FLY");
+  assert(s.audio.activeVoices <= 6);
+  await page.screenshot({ path: `${out}/03-stereo-flight.png` });
+  record("Trigger starts flight and delayed spatial audio in real time");
+  await button(250, 243);
+  s = await state();
+  assert.equal(s.paused, true);
+  const stopped = s.elapsedMs;
+  assert.equal(s.audio.activeVoices, 0);
+  await page.waitForTimeout(400);
+  assert.equal((await state()).elapsedMs, stopped);
+  await button(250, 243);
+  await wait(() => !JSON.parse(window.render_game_to_text()).paused);
+  record("Spatial pause drains voices and freezes time; resume continues");
+
+  const p = (await state()).aircraft.position;
+  await aim([p.x, p.y, p.z]);
+  await press();
+  assert.equal((await state()).vr.selected, "ST-01");
+  await button(750, 243);
+  assert.equal((await state()).audio.muted, true);
+  await button(750, 243);
+  assert.equal((await state()).audio.muted, false);
+  record(
+    "Aircraft ray selection and sound toggle remain separate from flight control",
+  );
+
+  await page.evaluate(() => xrDevice.updateVisibilityState("visible-blurred"));
+  await wait(() => JSON.parse(window.render_game_to_text()).paused);
+  assert.equal((await state()).audio.activeVoices, 0);
+  await page.evaluate(() => xrDevice.updateVisibilityState("visible"));
+  await page.waitForTimeout(300);
+  assert.equal((await state()).paused, true);
+  await button(250, 243);
+  assert.equal((await state()).paused, false);
+  await page.evaluate(() => xrDevice.updateVisibilityState("hidden"));
+  await wait(() => JSON.parse(window.render_game_to_text()).paused);
+  await page.evaluate(() => xrDevice.updateVisibilityState("visible"));
+  await page.waitForTimeout(300);
+  assert.equal((await state()).paused, true);
+  record("Blurred and hidden sessions pause without automatic resumption");
+  await button(850, 453);
+  await wait(
+    () => JSON.parse(window.render_game_to_text()).vr.status === "ready",
+  );
+  s = await state();
+  assert.deepEqual(s.listener, { x: 0, y: 1.7, z: 0 });
+  assert(s.paused);
+  assert.equal(s.audio.activeVoices, 0);
+  await page.screenshot({ path: `${out}/04-return-to-page.png` });
+  const geometries = s.render.geometries;
+  record(
+    "Spatial exit restores the PC observer and leaves flight safely paused",
+  );
+  await page.locator("#vr-enter").click();
+  await wait(() => JSON.parse(window.render_game_to_text()).vr.frames > 12);
+  assert.equal((await state()).vr.views, 2);
+  await page.evaluate(() => xrDevice.activeSession.end());
+  await wait(
+    () => JSON.parse(window.render_game_to_text()).vr.status === "ready",
+  );
+  await page.waitForTimeout(250);
+  s = await state();
+  assert(s.render.geometries <= geometries + 1);
+  record("Re-entry and system exit clean up XR geometry without growth");
+  await page
+    .getByRole("button", { name: "航路を描き直す", exact: true })
+    .click();
+  await page.getByRole("button", { name: "3機", exact: true }).click();
+  await page.getByRole("button", { name: "丘の上", exact: true }).click();
+  await page
+    .getByRole("checkbox", {
+      name: "周回ごとに変化して飛び続ける",
+      exact: true,
+    })
+    .check();
+  const hill = (await state()).listener;
+  await page.locator("#vr-enter").click();
+  await wait(() => JSON.parse(window.render_game_to_text()).vr.frames > 12);
+  s = await state();
+  assert(Math.abs(s.listener.x - hill.x) < 0.01);
+  assert(Math.abs(s.listener.y - (hill.y - 1.7 + 1.65)) < 0.01);
+  await button(250, 243);
+  await wait(
+    () =>
+      JSON.parse(window.render_game_to_text()).audio.playedByFlight["ST-03"] >
+      0,
+    undefined,
+    60000,
+  );
+  await button(500, 350);
+  assert.equal((await state()).inspection.id, "ST-02");
+  const firstPlane = (await state()).aircraft.position;
+  await aim([firstPlane.x, firstPlane.y, firstPlane.z]);
+  await press();
+  assert.equal((await state()).inspection.id, "ST-01");
+  s = await state();
+  assert.equal(s.vr.views, 2);
+  assert(s.audio.activeVoices <= 18);
+  await page.screenshot({ path: `${out}/05-three-aircraft.png` });
+  record(
+    "Three aircraft sound independently; ray switches selection; hill origin remains in metres",
+  );
+  if (await page.evaluate(() => typeof window.advanceTime === "function")) {
+    const beforeLap = s.lap;
+    await page.evaluate(
+      (ms) => window.advanceTime(ms),
+      s.durationMs * 2 + 50000,
+    );
+    s = await state();
+    assert(s.lap > beforeLap);
+    assert.equal(s.vr.status, "presenting");
+    assert.equal(s.vr.views, 2);
+    record(
+      "Accelerated multi-lap evolution preserves the active stereo session",
+    );
+  }
+  await page.evaluate(() => xrDevice.activeSession.end());
+  await wait(
+    () => JSON.parse(window.render_game_to_text()).vr.status === "ready",
+  );
+  assert.deepEqual((await state()).listener, hill);
+  record("Non-default observer returns unchanged after VR");
+  s = await state();
+  assert.deepEqual(errors, []);
+  await fs.writeFile(
+    `${out}/results.json`,
+    JSON.stringify(
+      {
+        url,
+        emulator: "IWER 2.4.0 / Meta Quest 3, not physical hardware",
+        checks,
+        errors,
+        final: s,
+      },
+      null,
+      2,
+    ),
+  );
+  console.log(
+    `${checks.length} VR scenarios passed. Physical Quest comfort and performance remain unverified.`,
+  );
+} finally {
+  await browser.close();
+}
