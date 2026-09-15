@@ -73,7 +73,7 @@ export function AirspaceControls({
                 <button
                   key={a.id}
                   aria-label={`${a.id}に注目`}
-                  aria-pressed={focusId === a.id}
+                  aria-pressed={mixMode === "focus" && focusId === a.id}
                   onClick={() => e.setMix("focus", a.id)}
                 >
                   <i style={{ background: a.accent }} />

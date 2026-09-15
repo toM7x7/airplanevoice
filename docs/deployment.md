@@ -1,6 +1,6 @@
 # 公開先・クラウド構成・展示会の予備動作
 
-更新: 2026-09-15 / v0.5.1
+更新: 2026-09-15 / v0.5.2
 
 ## 試遊版の公開先
 
@@ -8,7 +8,11 @@ GitHub Pagesで静的Webアプリの試遊版を配信する。独自ドメイ�
 
 公開URL: [SOUND TRAILを試す](https://tom7x7.github.io/airplanevoice/)
 
-v0.5.1の音の改善版を公開。コミット`3dc13fa`の[公開処理](https://github.com/toM7x7/airplanevoice/actions/runs/34941367316)・[CI](https://github.com/toM7x7/airplanevoice/actions/runs/34941367306)が成功。公開URLにIWERをテスト側から注入し、VR17項目が合格。3機と合成後の同時波形、VR内の音量・出力設定・聴き方の切り替えを確認した。単体のオフライン再読込・設定復元・初周と第2周の実時間飛行・音声ノードの再生開始・接続復帰も合格。配布アプリにエミュレーターは含めない。Quest 3実機で音が改善したかは[再試遊](quest-vr.md)で確認する。
+v0.5.2で機体に重なる軌跡・波紋を薄くし、VRとPCに選択解除を追加。コミット`2633fc1`の[公開処理](https://github.com/toM7x7/airplanevoice/actions/runs/34948142221)・[CI](https://github.com/toM7x7/airplanevoice/actions/runs/34948142084)が成功。見え方と解除操作の実機評価は[再試遊](quest-vr.md)で確認する。
+
+公開URLのVR模擬19項目が合格。3機と合成後の同時波形、通常・音設定の両ページでの選択解除、情報・マークの消去、全体ミックスへの復帰、休憩の保持・再選択を確認した。結果と画像は`output/vr-v052-public`に保存。Questでの見やすさの受入とは分ける。
+
+前版v0.5.1ではコミット`3dc13fa`の[公開処理](https://github.com/toM7x7/airplanevoice/actions/runs/34941367316)・[CI](https://github.com/toM7x7/airplanevoice/actions/runs/34941367306)が成功。公開URLのVR17項目と単体オフライン復帰を確認した。続くQuest 3実機の再試遊で、3機とも聞こえたと回答を受領。配布アプリにテスト用エミュレーターは含めない。
 
 `.github/workflows/pages.yml` がmainへの変更を受け、テスト・ビルドを通してdistを公開する。3D描画と音は参加者のブラウザで動く。現段階の「クラウド」はWebアプリの配信であり、共有部屋やAIのクラウド処理はまだ接続していない。
 
