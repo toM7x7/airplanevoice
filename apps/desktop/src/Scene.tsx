@@ -16,6 +16,22 @@ export interface ViewState {
   pitch: number;
   zoom: boolean;
 }
+export interface AircraftTarget {
+  id: FlightId;
+  x: number;
+  y: number;
+  radius: number;
+  distance: number;
+}
+interface SceneProps {
+  experience: Experience;
+  audio: AircraftAudio;
+  view: MutableRefObject<ViewState>;
+  manual: MutableRefObject<boolean>;
+  reduced: boolean;
+  selectedId: FlightId | null;
+  onSelect: (id: FlightId) => void;
+}
 const UP = new THREE.Vector3(0, 1, 0);
 const Z = new THREE.Vector3(0, 0, 1);
 
@@ -100,18 +116,18 @@ function World({
   view,
   manual,
   reduced,
-}: {
-  experience: Experience;
-  audio: AircraftAudio;
-  view: MutableRefObject<ViewState>;
-  manual: MutableRefObject<boolean>;
-  reduced: boolean;
+  selectedId,
+  targets,
+  marker,
+}: SceneProps & {
+  targets: MutableRefObject<AircraftTarget[]>;
+  marker: MutableRefObject<HTMLDivElement | null>;
 }) {
   const aircraft = useRef<(THREE.Group | null)[]>([]);
   const design = useRef<THREE.LineLoop>(null);
   const trail = useRef<THREE.LineSegments>(null);
   const rings = useRef<THREE.InstancedMesh>(null);
-  const { camera, gl } = useThree();
+  const { camera, gl, size } = useThree();
   const geometry = useMemo(() => new THREE.BufferGeometry(), []);
   const trailGeometry = useMemo(() => {
     const g = new THREE.BufferGeometry();
@@ -161,6 +177,7 @@ function World({
       right: new THREE.Vector3(),
       up: new THREE.Vector3(),
       forward: new THREE.Vector3(),
+      projected: new THREE.Vector3(),
       matrix: new THREE.Matrix4(),
       bank: new THREE.Quaternion(),
       dummy: new THREE.Object3D(),
@@ -192,6 +209,7 @@ function World({
     camera.getWorldDirection(temp.forward);
     temp.up.set(0, 1, 0).applyQuaternion(camera.quaternion);
     audio.setListener(e.listener, temp.forward, temp.up);
+    const visibleTargets: AircraftTarget[] = [];
     aircraft.current.forEach((mesh, index) => {
       if (!mesh) return;
       const f = e.flights[index];
@@ -208,7 +226,42 @@ function World({
       mesh.quaternion
         .setFromRotationMatrix(temp.matrix)
         .multiply(temp.bank.setFromAxisAngle(Z, -pose.bankRad));
+      temp.projected.copy(mesh.position).project(camera);
+      const p = temp.projected;
+      if (Math.abs(p.x) <= 1 && Math.abs(p.y) <= 1 && p.z >= -1 && p.z <= 1) {
+        const distance = mesh.position.distanceTo(camera.position);
+        const fov = camera instanceof THREE.PerspectiveCamera ? camera.fov : 58;
+        visibleTargets.push({
+          id: AIRCRAFT[index].id,
+          x: ((p.x + 1) * size.width) / 2,
+          y: ((1 - p.y) * size.height) / 2,
+          radius: clamp(
+            (Math.max(
+              e.aircraftDesign.bodyLengthM,
+              e.aircraftDesign.wingSpanM,
+            ) *
+              size.height) /
+              (4 * Math.tan((fov * Math.PI) / 360) * distance),
+            16,
+            80,
+          ),
+          distance,
+        });
+      }
     });
+    targets.current = visibleTargets;
+    window.__soundTrailTargets = visibleTargets;
+    if (marker.current) {
+      const selected = visibleTargets.find((t) => t.id === selectedId);
+      marker.current.style.visibility =
+        selected && !e.paused ? "visible" : "hidden";
+      if (selected) {
+        marker.current.style.left = `${selected.x}px`;
+        marker.current.style.top = `${selected.y}px`;
+        marker.current.style.width = `${selected.radius * 2 + 10}px`;
+        marker.current.style.height = `${selected.radius * 2 + 10}px`;
+      }
+    }
     if (checksum.current !== e.route.checksum) {
       geometry.setFromPoints(
         e.route.samples.map(
@@ -316,38 +369,103 @@ function World({
   );
 }
 
-export function Scene(props: {
-  experience: Experience;
-  audio: AircraftAudio;
-  view: MutableRefObject<ViewState>;
-  manual: MutableRefObject<boolean>;
-  reduced: boolean;
-}) {
-  const drag = useRef<{ x: number; y: number } | null>(null);
+export function Scene(props: SceneProps) {
+  const drag = useRef<{
+    x: number;
+    y: number;
+    startX: number;
+    startY: number;
+    moved: boolean;
+    pointerId: number;
+  } | null>(null);
+  const targets = useRef<AircraftTarget[]>([]);
+  const marker = useRef<HTMLDivElement>(null);
+  function pick(x: number, y: number, touch: boolean) {
+    return targets.current
+      .filter(
+        (t) =>
+          Math.hypot(t.x - x, t.y - y) <= Math.max(t.radius, touch ? 22 : 16),
+      )
+      .sort(
+        (a, b) =>
+          Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y) ||
+          a.distance - b.distance,
+      )[0]?.id;
+  }
   return (
     <div
       className="world"
-      aria-label="飛行観察の3D画面。ドラッグで空を見回せます。"
+      aria-label="飛行観察の3D画面。ドラッグで見回し、機体を押すと情報が開きます。"
       onPointerDown={(event) => {
-        if (event.target instanceof HTMLCanvasElement) {
-          drag.current = { x: event.clientX, y: event.clientY };
+        if (
+          event.target instanceof HTMLCanvasElement &&
+          event.button === 0 &&
+          event.isPrimary &&
+          !drag.current
+        ) {
+          drag.current = {
+            x: event.clientX,
+            y: event.clientY,
+            startX: event.clientX,
+            startY: event.clientY,
+            moved: false,
+            pointerId: event.pointerId,
+          };
           event.currentTarget.setPointerCapture(event.pointerId);
         }
       }}
       onPointerMove={(event) => {
-        if (!drag.current) return;
-        props.view.current.yaw += (event.clientX - drag.current.x) * 0.003;
-        props.view.current.pitch = clamp(
-          props.view.current.pitch + (event.clientY - drag.current.y) * 0.003,
-          -0.12,
-          1.45,
-        );
-        drag.current = { x: event.clientX, y: event.clientY };
+        const d = drag.current;
+        if (!d) {
+          const rect = event.currentTarget.getBoundingClientRect();
+          event.currentTarget.style.cursor = pick(
+            event.clientX - rect.left,
+            event.clientY - rect.top,
+            event.pointerType === "touch",
+          )
+            ? "pointer"
+            : "grab";
+          return;
+        }
+        if (event.pointerId !== d.pointerId) return;
+        if (Math.hypot(event.clientX - d.startX, event.clientY - d.startY) > 6)
+          d.moved = true;
+        if (d.moved) {
+          event.currentTarget.style.cursor = "grabbing";
+          props.view.current.yaw += (event.clientX - d.x) * 0.003;
+          props.view.current.pitch = clamp(
+            props.view.current.pitch + (event.clientY - d.y) * 0.003,
+            -0.12,
+            1.45,
+          );
+        }
+        d.x = event.clientX;
+        d.y = event.clientY;
       }}
-      onPointerUp={() => {
+      onPointerUp={(event) => {
+        const d = drag.current;
+        if (!d || d.pointerId !== event.pointerId) return;
+        if (
+          !d.moved &&
+          Math.hypot(event.clientX - d.startX, event.clientY - d.startY) <= 6
+        ) {
+          const rect = event.currentTarget.getBoundingClientRect();
+          const id = pick(
+            event.clientX - rect.left,
+            event.clientY - rect.top,
+            event.pointerType === "touch",
+          );
+          if (id) props.onSelect(id);
+        }
         drag.current = null;
+        if (event.currentTarget.hasPointerCapture(event.pointerId))
+          event.currentTarget.releasePointerCapture(event.pointerId);
+        event.currentTarget.style.cursor = "grab";
       }}
       onPointerCancel={() => {
+        drag.current = null;
+      }}
+      onLostPointerCapture={() => {
         drag.current = null;
       }}
     >
@@ -361,8 +479,11 @@ export function Scene(props: {
           </div>
         }
       >
-        <World {...props} />
+        <World {...props} targets={targets} marker={marker} />
       </Canvas>
+      <div ref={marker} className="aircraft-marker" aria-hidden="true">
+        <span>{props.selectedId}</span>
+      </div>
     </div>
   );
 }

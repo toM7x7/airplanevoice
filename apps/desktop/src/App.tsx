@@ -15,12 +15,15 @@ import {
   type PresetId,
   type RouteSpec,
   validateAircraft,
+  aircraftInfo,
+  type FlightId,
 } from "../../../packages/core/src";
 import { AircraftAudio } from "./audio";
 import { Scene, type ViewState } from "./Scene";
 import { RouteEditor } from "./RouteEditor";
 import { AirspaceControls } from "./AirspaceControls";
 import { Workshop } from "./Workshop";
+import { AircraftInfo } from "./AircraftInfo";
 
 function Icon({
   name,
@@ -133,12 +136,26 @@ export function App() {
   const [workshop, setWorkshop] = useState(false);
   const [offlineReady, setOfflineReady] = useState(false);
   const [online, setOnline] = useState(navigator.onLine);
+  const [inspectedId, setInspectedId] = useState<FlightId | null>(null);
   const view = useRef<ViewState>({ yaw: 0, pitch: 0.32, zoom: false });
   const manual = useRef(false);
   const messageTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editing = snapshot.phase === "EDIT";
   const interlap = snapshot.phase === "INTERLAP";
   const active = !editing && !interlap;
+  const inspection = inspectedId ? aircraftInfo(e, inspectedId) : null;
+  useEffect(() => {
+    if (inspectedId && !e.flightIds.includes(inspectedId)) setInspectedId(null);
+  }, [e, inspectedId, snapshot.airspace.aircraftCount]);
+  function lookAtAircraft(id: FlightId) {
+    if (!aircraftInfo(e, id)?.visible) return;
+    const p = e.pose(id).position;
+    const x = p.x - e.listener.x,
+      y = p.y - e.listener.y,
+      z = p.z - e.listener.z;
+    view.current.yaw = Math.atan2(-x, -z);
+    view.current.pitch = Math.atan2(y, Math.hypot(x, z));
+  }
 
   const notifyMessage = useCallback((text: string) => {
     setMessage(text);
@@ -175,6 +192,7 @@ export function App() {
   }
   function edit() {
     audio.stop();
+    setInspectedId(null);
     e.edit();
   }
   function pause() {
@@ -197,6 +215,7 @@ export function App() {
     audio.stop();
     e.reset();
     setWorkshop(false);
+    setInspectedId(null);
     setObserver("garden");
     setDelay(1.6);
     setZoom(false);
@@ -217,7 +236,7 @@ export function App() {
       [
         JSON.stringify(
           {
-            version: "0.3.0",
+            version: "0.3.1",
             platform: "desktop-local",
             route: e.spec,
             aircraftDesign: e.aircraftDesign,
@@ -309,6 +328,8 @@ export function App() {
         render: window.__soundTrailRender,
         view: view.current,
         offline: { ready: offlineReady, online },
+        inspection: inspectedId ? aircraftInfo(e, inspectedId) : null,
+        aircraftTargets: window.__soundTrailTargets ?? [],
       });
     if (import.meta.env.DEV)
       window.advanceTime = async (ms: number) => {
@@ -322,7 +343,7 @@ export function App() {
           requestAnimationFrame(() => resolve()),
         );
       };
-  }, [e, audio, muted, offlineReady, online]);
+  }, [e, audio, muted, offlineReady, online, inspectedId]);
   useEffect(() => {
     function onHidden() {
       if (
@@ -343,6 +364,11 @@ export function App() {
   }, [e, audio]);
   useEffect(() => {
     function key(event: KeyboardEvent) {
+      if (event.key === "Escape" && inspectedId && !help) {
+        event.preventDefault();
+        setInspectedId(null);
+        return;
+      }
       const element = event.target as HTMLElement;
       if (element.closest("input, select, textarea, button") || event.repeat)
         return;
@@ -636,127 +662,154 @@ export function App() {
           </div>
         </aside>
         <div className="viewport">
-          <Scene
-            experience={e}
-            audio={audio}
-            view={view}
-            manual={manual}
-            reduced={reduced}
-          />
-          <div className="sky-top">
-            <span className="sky-label">
-              <span className="status-dot" />
-              CLEAR MORNING <span>快晴の朝</span>
-            </span>
-            <div className="sky-controls">
+          <div className="sky-stage">
+            <Scene
+              experience={e}
+              audio={audio}
+              view={view}
+              manual={manual}
+              reduced={reduced}
+              selectedId={inspectedId}
+              onSelect={setInspectedId}
+            />
+            <div className="sky-top">
+              <span className="sky-label">
+                <span className="status-dot" />
+                CLEAR MORNING <span>快晴の朝</span>
+              </span>
+              <div className="sky-controls">
+                <button
+                  className={`glass-button info-toggle ${inspection ? "on" : ""}`}
+                  aria-label="機体情報を表示"
+                  aria-expanded={!!inspection}
+                  onClick={() => setInspectedId(inspection ? null : "ST-01")}
+                >
+                  <Icon name="plane" />
+                  <span>機体情報</span>
+                </button>
+                <button
+                  className={`glass-button ${zoom ? "on" : ""}`}
+                  aria-label="遠くを見る"
+                  aria-pressed={zoom}
+                  onClick={() => {
+                    setZoom(!zoom);
+                    view.current.zoom = !zoom;
+                  }}
+                >
+                  <Icon name="eye" />
+                </button>
+                <button
+                  className="glass-button sound-button"
+                  onClick={() => void sound()}
+                  aria-label="音声を切り替え"
+                  aria-pressed={audioReady && !muted}
+                >
+                  <Icon name={muted || !audioReady ? "mute" : "sound"} />
+                  <span>
+                    {!audioReady ? "音をオン" : muted ? "消音中" : "音あり"}
+                  </span>
+                </button>
+              </div>
+            </div>
+            {editing && (
+              <div className="sky-caption">
+                <span>OBSERVATION FIELD</span>
+                <h2>あの音が届くまで。</h2>
+                <p>
+                  {e.airspace.aircraftCount === 1
+                    ? "一機の飛行機と、あなたの空。"
+                    : "いくつもの響きが行き交う、あなたの空。"}
+                </p>
+              </div>
+            )}
+            {snapshot.phase === "COMPILE" && (
+              <div className="countdown" role="status">
+                <span>{Math.ceil(snapshot.countdownSec)}</span>
+                <p>空を見上げよう。</p>
+              </div>
+            )}
+            {snapshot.paused && (
+              <div className="pause-overlay">
+                <span>ひと休み</span>
+                <button onClick={pause}>飛行を再開する</button>
+              </div>
+            )}
+            <div
+              className="tower-caption"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              {!snapshot.paused && snapshot.towerCue && (
+                <div>
+                  <span>管制案内</span>
+                  <p>{snapshot.towerCue.text}</p>
+                </div>
+              )}
+            </div>
+            <div className="horizon-note">
+              {e.route.speedMps} m/s <span>／</span>{" "}
+              {e.aircraftDesign.engineCount} ENGINES <span>／</span> ONE OPEN
+              SKY
+            </div>
+            <div className="view-bottom">
+              <div className="observer-control">
+                <span>眺める場所</span>
+                <div>
+                  {OBSERVERS.map((o) => (
+                    <button
+                      key={o.id}
+                      disabled={active}
+                      className={observer === o.id ? "selected" : ""}
+                      onClick={() => {
+                        setObserver(o.id);
+                        e.setListener(o.position);
+                      }}
+                      aria-pressed={observer === o.id}
+                    >
+                      {o.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <button
-                className={`glass-button ${zoom ? "on" : ""}`}
-                aria-label="遠くを見る"
-                aria-pressed={zoom}
+                className="view-reset"
                 onClick={() => {
-                  setZoom(!zoom);
-                  view.current.zoom = !zoom;
+                  view.current.yaw = 0;
+                  view.current.pitch = 0.32;
                 }}
               >
-                <Icon name="eye" />
+                正面を向く ↗
               </button>
-              <button
-                className="glass-button sound-button"
-                onClick={() => void sound()}
-                aria-label="音声を切り替え"
-                aria-pressed={audioReady && !muted}
-              >
-                <Icon name={muted || !audioReady ? "mute" : "sound"} />
+            </div>
+            {!editing && (
+              <div className="flight-progress">
+                <span>{snapshot.paused ? "PAUSED" : phaseLabel}</span>
+                <div>
+                  <i style={{ width: `${snapshot.progress * 100}%` }} />
+                </div>
                 <span>
-                  {!audioReady ? "音をオン" : muted ? "消音中" : "音あり"}
+                  {Math.min(
+                    Math.round(snapshot.elapsedMs / 1000),
+                    Math.round(snapshot.durationMs / 1000),
+                  )}{" "}
+                  s
                 </span>
-              </button>
-            </div>
-          </div>
-          {editing && (
-            <div className="sky-caption">
-              <span>OBSERVATION FIELD</span>
-              <h2>あの音が届くまで。</h2>
-              <p>
-                {e.airspace.aircraftCount === 1
-                  ? "一機の飛行機と、あなたの空。"
-                  : "いくつもの響きが行き交う、あなたの空。"}
-              </p>
-            </div>
-          )}
-          {snapshot.phase === "COMPILE" && (
-            <div className="countdown" role="status">
-              <span>{Math.ceil(snapshot.countdownSec)}</span>
-              <p>空を見上げよう。</p>
-            </div>
-          )}
-          {snapshot.paused && (
-            <div className="pause-overlay">
-              <span>ひと休み</span>
-              <button onClick={pause}>飛行を再開する</button>
-            </div>
-          )}
-          <div className="tower-caption" aria-live="polite" aria-atomic="true">
-            {!snapshot.paused && snapshot.towerCue && (
-              <div>
-                <span>管制案内</span>
-                <p>{snapshot.towerCue.text}</p>
+              </div>
+            )}
+            {message && (
+              <div className="toast" role="status">
+                {message}
               </div>
             )}
           </div>
-          <div className="horizon-note">
-            {e.route.speedMps} m/s <span>／</span>{" "}
-            {e.aircraftDesign.engineCount} ENGINES <span>／</span> ONE OPEN SKY
-          </div>
-          <div className="view-bottom">
-            <div className="observer-control">
-              <span>眺める場所</span>
-              <div>
-                {OBSERVERS.map((o) => (
-                  <button
-                    key={o.id}
-                    disabled={active}
-                    className={observer === o.id ? "selected" : ""}
-                    onClick={() => {
-                      setObserver(o.id);
-                      e.setListener(o.position);
-                    }}
-                    aria-pressed={observer === o.id}
-                  >
-                    {o.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <button
-              className="view-reset"
-              onClick={() => {
-                view.current.yaw = 0;
-                view.current.pitch = 0.32;
-              }}
-            >
-              正面を向く ↗
-            </button>
-          </div>
-          {!editing && (
-            <div className="flight-progress">
-              <span>{snapshot.paused ? "PAUSED" : phaseLabel}</span>
-              <div>
-                <i style={{ width: `${snapshot.progress * 100}%` }} />
-              </div>
-              <span>
-                {Math.min(
-                  Math.round(snapshot.elapsedMs / 1000),
-                  Math.round(snapshot.durationMs / 1000),
-                )}{" "}
-                s
-              </span>
-            </div>
-          )}
-          {message && (
-            <div className="toast" role="status">
-              {message}
-            </div>
+          {inspection && (
+            <AircraftInfo
+              info={inspection}
+              ids={e.flightIds}
+              onSelect={setInspectedId}
+              onClose={() => setInspectedId(null)}
+              onLook={() => lookAtAircraft(inspection.id)}
+            />
           )}
         </div>
       </section>
@@ -768,7 +821,7 @@ export function App() {
         >
           音・表示の設定 <span>{diagnostics ? "−" : "+"}</span>
         </button>
-        <span className="version">WORKSHOP · v0.3</span>
+        <span className="version">WORKSHOP · v0.3.1</span>
       </footer>
       {diagnostics && (
         <section className="settings" aria-label="音と表示の設定">
@@ -865,7 +918,7 @@ export function App() {
               <li>
                 <strong>飛行機を眺める。</strong>
                 <span>
-                  「飛ばす」を押すと、線は消えます。空をドラッグして見回し、目のボタンで拡大できます。
+                  「飛ばす」を押すと、線は消えます。空をドラッグして見回し、目のボタンで拡大。機体を押すと速度・進行方向が見られます。右上の「機体情報」からも選べます。
                 </span>
               </li>
               <li>

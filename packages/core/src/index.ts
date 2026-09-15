@@ -9,3 +9,4 @@ export * from "./experience";
 export * from "./airspace";
 export * from "./tower";
 export * from "./workshop";
+export * from "./observation";
