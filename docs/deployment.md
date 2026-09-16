@@ -6,7 +6,9 @@
 
 v0.9.0で展示入口・観覧用QR・繰り返し飛行・共有版AR切り替えを追加。[展示の準備と8時間の制約](room-lobby-flow.md)。有料契約・追加のクラウドサービス・独自ドメインは導入していない。
 
-Cloudflare配置版ID: `090a543e-f9f3-4b2f-b817-5d6e19515240`。型検査・ビルド・dry-runとローカル検証後に配置。公開URLでの確認結果は下記のリリース記録へ追記する。
+Cloudflare配置版ID: `090a543e-f9f3-4b2f-b817-5d6e19515240`。型検査・ビルド・dry-runとローカル検証後に配置。公開URLで展示入口8項目と実際のalarmによる次便開始・最新設定の採用・停止が合格（`output/exhibition-public-v090`）。
+
+実装コミット`c12e1fd`の[CI](https://github.com/toM7x7/airplanevoice/actions/runs/35057530437)と[Pages公開](https://github.com/toM7x7/airplanevoice/actions/runs/35057530448)が成功し、Pagesが当該ビルドのアセットを配信していることを確認。Quest実機と8時間の連続運用は確認待ち。
 
 ### 展示とARを試す
 
