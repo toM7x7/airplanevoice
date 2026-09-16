@@ -1,4 +1,5 @@
 import { compileRoute } from "./route";
+import { checkedVenue, type VenueMap } from "./venue";
 import {
   DEFAULT_WORKSHOP,
   parseWorkshop,
@@ -25,8 +26,10 @@ export interface RoomState {
   expiresAt: number;
   recentOperations: string[];
   exhibition?: { repeat: boolean };
+  venue?: VenueMap;
 }
 export type RoomOperation =
+  | { id: string; revision: number; type: "venue"; venue: VenueMap }
   | { id: string; revision: number; type: "edit"; recipe: WorkshopRecipe }
   | { id: string; revision: number; type: "repeat"; enabled: boolean }
   | { id: string; revision: number; type: "launch" | "cancel-next" };
@@ -66,7 +69,8 @@ export function changeRoom(
       "相手が先に変更しました。最新の設定を見て、もう一度操作してください。",
     );
   const next = structuredClone(state);
-  if (op.type === "edit") next.draft = checkedWorkshop(op.recipe).recipe;
+  if (op.type === "venue") next.venue = checkedVenue(op.venue);
+  else if (op.type === "edit") next.draft = checkedWorkshop(op.recipe).recipe;
   else if (op.type === "launch") {
     const pending = state.flights.filter((f) => f.startsAt > now);
     if (pending.length)

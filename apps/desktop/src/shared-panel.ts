@@ -9,9 +9,10 @@ import type { RoomClient } from "./room-client";
 import type { AircraftAudio } from "./audio";
 import type { SharedVrPanel, VrRuntime } from "./vr";
 import type { Dispatch, SetStateAction } from "react";
+import type { VenueMap } from "../../../packages/core/src/venue";
 
 export type SharedPage =
-  "main" | "edit" | "points" | "audio" | "view" | "tower";
+  "main" | "edit" | "points" | "audio" | "view" | "tower" | "spatial" | "venue";
 interface PanelInput {
   page: SharedPage;
   setPage: (page: SharedPage) => void;
@@ -50,6 +51,8 @@ interface PanelInput {
   canRead: boolean;
   speaking: boolean;
   speechMessage: string;
+  venue: VenueMap;
+  saveVenue: (venue: VenueMap) => void;
 }
 /** Presentation only: all effects go through the same actions as PC controls. */
 export function sharedPanel({
@@ -90,6 +93,8 @@ export function sharedPanel({
   canRead,
   speaking,
   speechMessage,
+  venue,
+  saveVenue,
 }: PanelInput): SharedVrPanel {
   const buttons: SharedVrPanel["buttons"] = [];
   const add = (label: string, press: () => void, allowed = true) => {
@@ -104,7 +109,43 @@ export function sharedPanel({
       h: 69,
     });
   };
-  if (page === "tower") {
+  if (page === "spatial") {
+    add("机の位置合わせを始める", () => vr.beginAlignment(), vr.canShowAR);
+    add(
+      "重なりを確認",
+      () => vr.confirmAlignment(),
+      vrState.calibration === "checking",
+    );
+    add(vrState.showCalibration ? "基準点を隠す" : "基準点を見る", () =>
+      vr.toggleCalibrationMarkers(),
+    );
+    add("位置合わせを解除", () => vr.clearAlignment());
+    add("会場の地点へ", () => setPage("venue"));
+    add(
+      vrState.displayMode === "ar" ? "仮想の空に戻る" : "現実に重ねる",
+      () => vr.toggleEnvironment(),
+      vr.canShowAR,
+    );
+    add("見え方・操作案内", () => setPage("view"));
+    add("操作盤を閉じる", () => vr.hidePanel());
+  } else if (page === "venue") {
+    for (const p of venue.points.slice(0, 4))
+      add(
+        `${venue.selectedId === p.id ? "● " : ""}${p.name}`,
+        () => saveVenue({ ...venue, selectedId: p.id }),
+        enabled,
+      );
+    add(vrState.showVenue ? "会場の地点を隠す" : "会場の地点を表示", () =>
+      vr.toggleVenue(),
+    );
+    add(
+      "地点の選択を外す",
+      () => saveVenue({ ...venue, selectedId: null }),
+      enabled,
+    );
+    add("机の位置合わせへ", () => setPage("spatial"));
+    add("空の操作へ", () => setPage("main"));
+  } else if (page === "tower") {
     add("状況を読み上げる", read, canRead);
     add("案内を止める", stopSpeech, speaking);
     add("空の操作へ", () => setPage("main"));
@@ -121,7 +162,9 @@ export function sharedPanel({
     add("操作盤を閉じて眺める", () => vr.hidePanel());
     add("音の設定", () => setPage("audio"));
     add("選択を外す", clear);
-    add("再接続", client.reconnect, room.status !== "connected");
+    add(room.status === "connected" ? "机と会場" : "再接続", () =>
+      room.status === "connected" ? setPage("spatial") : client.reconnect(),
+    );
     add("空の操作へ", () => setPage("main"));
     add("ブラウザに戻る", () => void vr.exit());
     add("状況・案内", () => setPage("tower"));
@@ -223,30 +266,41 @@ export function sharedPanel({
   return {
     lines: page === "tower" ? towerLines : undefined,
     title:
-      page === "tower"
-        ? "管制 / 状況・案内"
-        : page === "view"
-          ? "見え方・操作案内（自分だけ）"
-          : page === "main"
-            ? "AIRPLANEVOICE / 共有する空"
-            : page === "edit"
-              ? "次の機体・航路をつくる"
-              : page === "points"
-                ? "次の航路 / 2地点を動かす"
-                : "自分の音の設定",
-    status: room.error || note || `${status} / ${flightLabel}`,
+      page === "spatial"
+        ? "机の位置合わせ（この端末）"
+        : page === "venue"
+          ? "会場の地点 / 共有マップ"
+          : page === "tower"
+            ? "管制 / 状況・案内"
+            : page === "view"
+              ? "見え方・操作案内（自分だけ）"
+              : page === "main"
+                ? "AIRPLANEVOICE / 共有する空"
+                : page === "edit"
+                  ? "次の機体・航路をつくる"
+                  : page === "points"
+                    ? "次の航路 / 2地点を動かす"
+                    : "自分の音の設定",
+    status:
+      page === "spatial"
+        ? vrState.calibrationMessage
+        : room.error || note || `${status} / ${flightLabel}`,
     detail:
-      page === "tower"
-        ? speechMessage
-        : page === "view"
-          ? vr.canShowAR
-            ? "移動せず眺めよう。切り替えても同じ便が続きます。"
-            : "この入場ではARに切り替えられません。"
-          : inspection?.visible && page === "main"
-            ? `${inspection.id} / ${Math.round(inspection.speedMps! * 3.6)} km/h / ${inspection.headingLabel} ${Math.round(inspection.headingDeg!)}°`
-            : page === "points"
-              ? `${point.toUpperCase()}：東西 ${recipe.route[point].x} m / 南北 ${recipe.route[point].z} m`
-              : `${recipe.aircraft.engineCount}発 / 高度 ${recipe.route.altitudeM} m / 速度 ${recipe.flight.speedMps} m/s / 音量 ${volume}%`,
+      page === "spatial"
+        ? `A→B ${Math.round(venue.baselineM * 100)} cm / CはAから奥へ同じ距離`
+        : page === "venue"
+          ? "地点を選ぶと全員に反映。ブース間の飛行は準備中です。"
+          : page === "tower"
+            ? speechMessage
+            : page === "view"
+              ? vr.canShowAR
+                ? "移動せず眺めよう。切り替えても同じ便が続きます。"
+                : "この入場ではARに切り替えられません。"
+              : inspection?.visible && page === "main"
+                ? `${inspection.id} / ${Math.round(inspection.speedMps! * 3.6)} km/h / ${inspection.headingLabel} ${Math.round(inspection.headingDeg!)}°`
+                : page === "points"
+                  ? `${point.toUpperCase()}：東西 ${recipe.route[point].x} m / 南北 ${recipe.route[point].z} m`
+                  : `${recipe.aircraft.engineCount}発 / 高度 ${recipe.route.altitudeM} m / 速度 ${recipe.flight.speedMps} m/s / 音量 ${volume}%`,
     buttons,
     hint: "人差し指のトリガー：決定 ／ 側面のグリップ：操作盤を呼ぶ",
   };

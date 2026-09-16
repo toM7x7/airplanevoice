@@ -2,7 +2,9 @@
 
 機体を作り、空に航路を描き、あとから届く音を待つ。
 
-**独立したWebアプリの検証版（v0.9.1）です。** Three.js / React Three Fiber、TypeScript、Web Audioで動きます。地上から旅客機を見上げ、遅れて届く音を聴く体験が原点です。
+**独立したWebアプリの検証版（v0.10.0）です。** Three.js / React Three Fiber、TypeScript、Web Audioで動きます。地上から旅客機を見上げ、遅れて届く音を聴く体験が原点です。
+
+v0.10.0: 共有版に、固定机の手動位置合わせと会場地点の登録・選択共有を追加。[Quest 3＋Quest 2の操作手順](docs/table-alignment.md)。実機2台での位置精度、会場内の案内飛行はこれから確認・開発します。[Meta VR CLIを使う実機テストの調査](docs/quest-test-tools.md)。
 
 共有版の「管制 / いまの状況と予定」で、飛行中・音の到来待ち・予約・下書きを確認できます。日本語音声がある端末では短い定型案内を読み上げます。外部AI・音声APIは未接続。[管制官と音声の次の設計・費用](docs/tower-and-voice.md)。
 

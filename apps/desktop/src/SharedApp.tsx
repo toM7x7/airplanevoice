@@ -31,6 +31,8 @@ import { Scene, type ViewState } from "./Scene";
 import { AnchorMap } from "./Workshop";
 import { AircraftInfo } from "./AircraftInfo";
 import "./shared.css";
+import { DEFAULT_VENUE, type VenueMap } from "../../../packages/core/src/venue";
+import { VenuePanel } from "./VenuePanel";
 
 export function SharedApp() {
   const [e] = useState(() => new Experience());
@@ -56,6 +58,7 @@ export function SharedApp() {
   const [point, setPoint] = useState<"a" | "b">("a");
   const [, repaint] = useState(0);
   const recipe = room.state?.draft ?? DEFAULT_WORKSHOP;
+  const venue = room.state?.venue ?? DEFAULT_VENUE;
   const compiled = useMemo(() => checkedWorkshop(recipe).route, [recipe]);
   const now = client.now();
   const next = room.state?.flights.find((f) => f.startsAt > now);
@@ -113,6 +116,15 @@ export function SharedApp() {
       );
     }
   };
+  const saveVenue = (venue: VenueMap) => {
+    if (enabled) client.send({ type: "venue", venue });
+  };
+  useEffect(() => {
+    vr.setTableFrame(client.id, venue);
+  }, [vr, client, client.id, venue.baselineM, venue.tableHeightM]);
+  useEffect(() => {
+    if (vrState.calibration === "lost") setPage("spatial");
+  }, [vrState.calibration]);
   const adjust = (kind: "altitude" | "speed", amount: number) => {
     const r = structuredClone(recipe);
     if (kind === "altitude")
@@ -212,6 +224,8 @@ export function SharedApp() {
     canRead: canReadSituation,
     speaking: speechState.speaking,
     speechMessage: speechState.message,
+    venue,
+    saveVenue,
   });
   const tick = () => {
     const state = client.snapshot.state;
@@ -325,7 +339,7 @@ export function SharedApp() {
       <header className="shared-header">
         <a href="./">音航跡 / AIRPLANEVOICE</a>
         <span>
-          共有する空 <small>v0.9.1</small>
+          共有する空 <small>v0.10.0</small>
         </span>
       </header>
       <div className="shared-layout">
@@ -472,6 +486,19 @@ export function SharedApp() {
                 onStop={speech.stop}
                 showDraft={!visitor}
                 resting={resting}
+              />
+              <VenuePanel
+                venue={venue}
+                enabled={enabled}
+                editable={!visitor}
+                vr={vr}
+                onSave={saveVenue}
+                onLook={() => {
+                  if (!vr.active) {
+                    view.current.yaw = -0.35;
+                    view.current.pitch = -0.6;
+                  }
+                }}
               />
               <details className="room-guide">
                 <summary>Questでの操作案内</summary>
@@ -679,6 +706,7 @@ export function SharedApp() {
             onSelect={setSelected}
             onClear={clear}
             onFrame={tick}
+            venue={venue}
           />
           <div className="shared-caption">
             <span>

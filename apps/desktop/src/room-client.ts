@@ -231,10 +231,12 @@ export class RoomClient {
       | { type: "launch" | "cancel-next" },
   ): void;
   send(input: { type: "repeat"; enabled: boolean }): void;
+  send(input: { type: "venue"; venue: NonNullable<RoomState["venue"]> }): void;
   send(input: {
     type: string;
     recipe?: RoomState["draft"];
     enabled?: boolean;
+    venue?: NonNullable<RoomState["venue"]>;
   }) {
     if (
       !this.ready ||

@@ -6,6 +6,12 @@ import {
   type Vec3,
 } from "../../../packages/core/src";
 import type { AircraftAudio } from "./audio";
+import {
+  DEFAULT_TABLE,
+  solveAlignment,
+  type Alignment,
+  type TableFrame,
+} from "../../../packages/core/src/spatial-alignment";
 
 type VrStatus =
   "checking" | "unsupported" | "ready" | "entering" | "presenting";
@@ -69,13 +75,17 @@ const AUDIO_BUTTONS: typeof BUTTONS = [
   { x: 330, y: 426, w: 360, h: 60, action: "clear" },
 ];
 
-/** Single-user, stationary observation. Metres and the original audio clock stay shared. */
+/** Per-device XR view. Shared flight coordinates stay in metres; calibration moves the local rig. */
 export class VrRuntime {
   snapshot = {
     status: "checking" as VrStatus,
     error: "",
     arSupported: false,
     displayMode: "vr" as "vr" | "ar",
+    calibration: "none" as "none" | "a" | "b" | "checking" | "aligned" | "lost",
+    calibrationMessage: "位置合わせは端末ごとに行います。",
+    showCalibration: false,
+    showVenue: false,
   };
   private sessionMode: XRSessionMode | null = null;
   private floor: THREE.Mesh | null = null;
@@ -105,6 +115,15 @@ export class VrRuntime {
   private canvas: HTMLCanvasElement | null = null;
   private ctx: CanvasRenderingContext2D | null = null;
   private controls: THREE.Group[] = [];
+  private grips: THREE.Group[] = [];
+  private tips: THREE.Mesh[] = [];
+  private frameConfig: TableFrame = DEFAULT_TABLE;
+  private frameKey = "";
+  private captureA: Vec3 | null = null;
+  private captureHand = -1;
+  private alignment: Alignment | null = null;
+  private rawOrientation = new THREE.Quaternion();
+  private tipOffset = new THREE.Vector3(0, 0, -0.05);
   private cleanups: (() => void)[] = [];
   private raycaster = new THREE.Raycaster();
   private position = new THREE.Vector3();
@@ -206,6 +225,14 @@ export class VrRuntime {
         this.savedListener.y - 1.7,
         this.savedListener.z,
       );
+      this.rig.quaternion.identity();
+      this.alignment = null;
+      this.captureA = null;
+      this.snapshot = {
+        ...this.snapshot,
+        calibration: "none",
+        calibrationMessage: "机の位置合わせを行ってください。",
+      };
       this.cameraParent = this.camera.parent;
       this.rig.add(this.camera);
       this.scene!.add(this.rig);
@@ -276,6 +303,130 @@ export class VrRuntime {
   hidePanel() {
     if (this.panel) this.panel.visible = false;
   }
+  setTableFrame(key: string, frame: TableFrame) {
+    const nextKey = `${key}/${frame.baselineM}/${frame.tableHeightM}`;
+    if (this.frameKey === nextKey) return;
+    const hadFrame = !!this.frameKey;
+    this.frameKey = nextKey;
+    this.frameConfig = { ...frame };
+    if (hadFrame && this.active)
+      this.invalidateAlignment(
+        "部屋か机の基準が変わりました。位置を合わせ直してください。",
+      );
+  }
+  get worldVisible() {
+    return this.snapshot.calibration !== "lost";
+  }
+  toggleCalibrationMarkers() {
+    this.snapshot = {
+      ...this.snapshot,
+      showCalibration: !this.snapshot.showCalibration,
+    };
+    this.state(this.snapshot.status);
+  }
+  toggleVenue() {
+    this.snapshot = { ...this.snapshot, showVenue: !this.snapshot.showVenue };
+    this.state(this.snapshot.status);
+  }
+  beginAlignment() {
+    if (!this.canShowAR || this.snapshot.status !== "presenting") return;
+    this.pause();
+    this.captureA = null;
+    this.captureHand = -1;
+    this.snapshot = {
+      ...this.snapshot,
+      displayMode: "ar",
+      showCalibration: true,
+      calibration: "a",
+      calibrationMessage:
+        "手元の光る玉を机のAへ合わせ、トリガー。グリップで中止。",
+    };
+    if (this.floor) this.floor.visible = false;
+    this.state(this.snapshot.status);
+  }
+  confirmAlignment() {
+    if (this.snapshot.calibration !== "checking") return;
+    this.snapshot = {
+      ...this.snapshot,
+      calibration: "aligned",
+      calibrationMessage: "A・B・Cの重なりを確認済み（この端末のみ）。",
+    };
+    this.state(this.snapshot.status);
+  }
+  clearAlignment() {
+    this.pause();
+    this.alignment = null;
+    this.captureA = null;
+    this.rig.quaternion.identity();
+    const p = this.savedListener;
+    if (p) this.rig.position.set(p.x, p.y - 1.7, p.z);
+    this.panelPlaced = false;
+    this.snapshot = {
+      ...this.snapshot,
+      calibration: "none",
+      calibrationMessage:
+        "位置合わせを解除しました。端末間の位置は未一致です。",
+    };
+    this.state(this.snapshot.status);
+  }
+  private invalidateAlignment(message: string) {
+    this.captureA = null;
+    this.alignment = null;
+    this.pause();
+    this.panelPlaced = false;
+    if (this.panel) this.panel.visible = true;
+    this.snapshot = {
+      ...this.snapshot,
+      calibration: "lost",
+      calibrationMessage: message,
+    };
+    this.state(this.snapshot.status);
+  }
+  private capturePoint(index: number) {
+    const grip = this.grips[index];
+    if (!grip?.visible) return;
+    const point = this.tipOffset
+      .clone()
+      .applyQuaternion(grip.quaternion)
+      .add(grip.position);
+    if (this.snapshot.calibration === "a") {
+      this.captureA = { x: point.x, y: point.y, z: point.z };
+      this.captureHand = index;
+      this.snapshot = {
+        ...this.snapshot,
+        calibration: "b",
+        calibrationMessage:
+          "同じ手の光る玉をBへ合わせ、トリガー。グリップで中止。",
+      };
+    } else if (this.captureA) {
+      if (index !== this.captureHand) return;
+      try {
+        const a = solveAlignment(this.captureA, point, this.frameConfig);
+        this.alignment = a;
+        this.rig.position.set(a.offset.x, a.offset.y, a.offset.z);
+        this.rig.rotation.set(0, a.yaw, 0);
+        this.rig.updateMatrixWorld(true);
+        this.panelPlaced = false;
+        this.snapshot = {
+          ...this.snapshot,
+          calibration: "checking",
+          calibrationMessage:
+            "A・B・Cの目印が重なるか確認し「重なりを確認」を押してください。",
+        };
+      } catch (error) {
+        this.snapshot = {
+          ...this.snapshot,
+          calibration: "a",
+          calibrationMessage:
+            error instanceof Error
+              ? error.message
+              : "位置合わせをやり直してください。",
+        };
+      }
+      this.captureA = null;
+    }
+    this.state(this.snapshot.status);
+  }
   private pause() {
     if (this.onLocalRest) {
       this.onLocalRest();
@@ -293,6 +444,16 @@ export class VrRuntime {
     }
   };
   private referenceReset = () => {
+    if (
+      this.alignment ||
+      this.snapshot.calibration === "a" ||
+      this.snapshot.calibration === "b"
+    ) {
+      this.invalidateAlignment(
+        "追跡の原点が変わりました。机の位置を合わせ直してください。",
+      );
+      return;
+    }
     this.pause();
     this.panelPlaced = false;
   };
@@ -319,13 +480,22 @@ export class VrRuntime {
     this.session = null;
     this.sessionMode = null;
     this.floor = null;
-    this.snapshot = { ...this.snapshot, displayMode: "vr" };
+    this.snapshot = {
+      ...this.snapshot,
+      displayMode: "vr",
+      calibration: "none",
+      calibrationMessage: "再入場したら、机の位置を合わせてください。",
+    };
+    this.alignment = null;
+    this.captureA = null;
     this.tracked = false;
     this.panel = null;
     this.marker = null;
     this.canvas = null;
     this.ctx = null;
     this.controls = [];
+    this.grips = [];
+    this.tips = [];
     if (this.snapshot.status !== "unsupported") this.state("ready");
   };
 
@@ -372,6 +542,18 @@ export class VrRuntime {
       const controller = this.renderer!.xr.getController(i);
       this.rig.add(controller);
       this.controls.push(controller);
+      const grip = this.renderer!.xr.getControllerGrip(i);
+      this.rig.add(grip);
+      this.grips.push(grip);
+      const tip = new THREE.Mesh(
+        new THREE.SphereGeometry(0.012, 12, 8),
+        new THREE.MeshBasicMaterial({ color: "#fff29b", depthTest: false }),
+      );
+      tip.position.copy(this.tipOffset);
+      tip.renderOrder = 10;
+      grip.add(tip);
+      this.tips.push(tip);
+      owned.push(tip);
       const ray = new THREE.Mesh(
         new THREE.CylinderGeometry(0.003, 0.003, 3, 6),
         new THREE.MeshBasicMaterial({ color: "#d9ffd3" }),
@@ -382,6 +564,13 @@ export class VrRuntime {
       owned.push(ray);
       const select = () => this.select(controller);
       const recall = () => {
+        if (
+          this.snapshot.calibration === "a" ||
+          this.snapshot.calibration === "b"
+        )
+          this.invalidateAlignment(
+            "位置合わせを中止しました。開始からやり直せます。",
+          );
         this.panelPlaced = false;
         if (this.panel) this.panel.visible = true;
       };
@@ -391,6 +580,7 @@ export class VrRuntime {
         controller.removeEventListener("selectstart", select);
         controller.removeEventListener("squeezestart", recall);
         controller.removeFromParent();
+        grip.removeFromParent();
       });
     }
     this.cleanups.push(() => {
@@ -410,6 +600,13 @@ export class VrRuntime {
       this.session?.visibilityState !== "visible"
     )
       return;
+    if (
+      this.snapshot.calibration === "a" ||
+      this.snapshot.calibration === "b"
+    ) {
+      this.capturePoint(this.controls.indexOf(controller));
+      return;
+    }
     controller.updateWorldMatrix(true, false);
     this.raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
     this.raycaster.ray.direction
@@ -488,20 +685,26 @@ export class VrRuntime {
     const pose = reference && frame.getViewerPose(reference);
     this.tracked = !!pose && this.session.visibilityState === "visible";
     if (!this.tracked || !pose) {
+      if (this.alignment || this.captureA || this.snapshot.calibration === "a")
+        this.invalidateAlignment(
+          "追跡を見失いました。机の位置を合わせ直してください。",
+        );
       this.pause();
       this.lastFrameAt = 0;
       return true;
     }
     const { position, orientation } = pose.transform;
+    this.rig.updateMatrixWorld(true);
     this.position
       .set(position.x, position.y, position.z)
-      .add(this.rig.position);
-    this.orientation.set(
+      .applyMatrix4(this.rig.matrixWorld);
+    this.rawOrientation.set(
       orientation.x,
       orientation.y,
       orientation.z,
       orientation.w,
     );
+    this.orientation.copy(this.rig.quaternion).multiply(this.rawOrientation);
     this.forward.set(0, 0, -1).applyQuaternion(this.orientation);
     this.up.set(0, 1, 0).applyQuaternion(this.orientation);
     this.experience.trackListener(this.position);
@@ -517,7 +720,10 @@ export class VrRuntime {
     }
     this.lastFrameAt = performance.now();
     if (!this.panelPlaced && this.panel) {
-      const yaw = Math.atan2(-this.forward.x, -this.forward.z);
+      const localForward = this.scratch
+        .set(0, 0, -1)
+        .applyQuaternion(this.rawOrientation);
+      const yaw = Math.atan2(-localForward.x, -localForward.z);
       this.panel.rotation.set(0, yaw, 0);
       this.panel.position.set(
         -Math.sin(yaw) * 2.8 + position.x,
@@ -529,14 +735,22 @@ export class VrRuntime {
     return true;
   }
   get canAdvance() {
-    return !this.active || this.tracked;
+    return !this.active || (this.tracked && this.worldVisible);
   }
   draw(selected: FlightId | null, soundOn: boolean) {
     this.selected = selected;
     this.soundOn = soundOn;
+    for (const tip of this.tips)
+      tip.visible =
+        this.snapshot.calibration === "a" ||
+        this.snapshot.calibration === "b" ||
+        this.snapshot.calibration === "checking";
     if (!this.session || !this.panel || !this.ctx || !this.marker) return;
     const info = selected ? aircraftInfo(this.experience, selected) : null;
-    this.marker.visible = !!info?.visible && this.snapshot.displayMode !== "ar";
+    this.marker.visible =
+      this.worldVisible &&
+      !!info?.visible &&
+      this.snapshot.displayMode !== "ar";
     if (info?.visible) {
       const p = this.experience.pose(info.id).position;
       this.marker.position.set(p.x, p.y, p.z);
@@ -735,6 +949,17 @@ export class VrRuntime {
           }
         : null,
       origin: this.rig.position.toArray(),
+      yaw: this.rig.rotation.y,
+      alignment: this.alignment,
+      table: this.frameConfig,
+      captureA: this.captureA,
+      gripPoints: this.grips.map((g) =>
+        this.tipOffset
+          .clone()
+          .applyQuaternion(g.quaternion)
+          .add(g.position)
+          .toArray(),
+      ),
       sampleFrames: sorted.length,
       frameMsP50: sorted[Math.floor(sorted.length * 0.5)] ?? null,
       frameMsP95: sorted[Math.floor(sorted.length * 0.95)] ?? null,

@@ -90,10 +90,11 @@ try {
             flightId && s.fleet.find((f) => f.id === flightId).pose.position;
           const target = p ? [p.x, p.y, p.z] : world;
           const c = xrDevice.controllers.right;
-          c.position.set(0.25, 1.3, -0.2);
-          const d = target.map(
-            (n, i) => n - s.vr.origin[i] - [0.25, 1.3, -0.2][i],
-          );
+          // Raise the pointing hand above the menu when targeting a plane.
+          // A ray from y=1.3 can intersect the menu's top edge before the aircraft.
+          const hand = [0.25, flightId ? 1.8 : 1.3, -0.2];
+          c.position.set(...hand);
+          const d = target.map((n, i) => n - s.vr.origin[i] - hand[i]);
           const length = Math.hypot(...d),
             [x, y, z] = d.map((n) => n / length);
           const norm = Math.hypot(y, -x, 1 - z);

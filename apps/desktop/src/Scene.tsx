@@ -19,6 +19,8 @@ import type { AircraftAudio } from "./audio";
 import type { VrRuntime } from "./vr";
 import { TrailVisibility } from "./trail-visibility";
 import { SkyEnvironment } from "./SkyEnvironment";
+import { VenueWorld } from "./VenueWorld";
+import type { VenueMap } from "../../../packages/core/src/venue";
 
 export interface ViewState {
   yaw: number;
@@ -44,6 +46,7 @@ interface SceneProps {
   onSelect: (id: FlightId) => void;
   onClear: () => void;
   onFrame?: () => void;
+  venue?: VenueMap;
 }
 const UP = new THREE.Vector3(0, 1, 0);
 const Z = new THREE.Vector3(0, 0, 1);
@@ -105,6 +108,7 @@ function World({
   onFrame,
   targets,
   marker,
+  venue,
 }: SceneProps & {
   targets: MutableRefObject<AircraftTarget[]>;
   marker: MutableRefObject<HTMLDivElement | null>;
@@ -380,17 +384,26 @@ function World({
       <group visible={!passthrough}>
         <Landscape />
       </group>
-      {AIRCRAFT.map((a, index) => (
-        <group
-          key={a.id}
-          ref={(mesh) => {
-            aircraft.current[index] = mesh;
-          }}
-        >
-          <Aircraft accent={a.accent} design={e.designFor(a.id)} />
-        </group>
-      ))}
-      <group visible={!passthrough}>
+      <group visible={vr.worldVisible}>
+        {venue && (
+          <VenueWorld
+            venue={venue}
+            markers={xr.showCalibration}
+            map={xr.showVenue}
+          />
+        )}
+        {AIRCRAFT.map((a, index) => (
+          <group
+            key={a.id}
+            ref={(mesh) => {
+              aircraft.current[index] = mesh;
+            }}
+          >
+            <Aircraft accent={a.accent} design={e.designFor(a.id)} />
+          </group>
+        ))}
+      </group>
+      <group visible={!passthrough && vr.worldVisible}>
         <primitive object={lineObject} ref={design} />
         <primitive object={trailObject} ref={trail} />
         <instancedMesh
@@ -472,7 +485,7 @@ export function Scene(props: SceneProps) {
           props.view.current.yaw += (event.clientX - d.x) * 0.003;
           props.view.current.pitch = clamp(
             props.view.current.pitch + (event.clientY - d.y) * 0.003,
-            -0.12,
+            props.venue ? -1.3 : -0.12,
             1.45,
           );
         }
