@@ -18,7 +18,15 @@ import { checkedWorkshop } from "../../../packages/core/src/shared-room";
 import { SharedPlayback } from "../../../packages/core/src/shared-playback";
 import { RoomClient } from "./room-client";
 import { AircraftAudio } from "./audio";
-import { VrRuntime, type SharedVrPanel } from "./vr";
+import { VrRuntime } from "./vr";
+import { sharedPanel, type SharedPage } from "./shared-panel";
+import { RoomInvite } from "./RoomInvite";
+import { RoomSpeech, type SpeechOutput } from "./room-speech";
+import { RoomTower } from "./RoomTower";
+import {
+  observeRoom,
+  describeRoom,
+} from "../../../packages/core/src/room-observation";
 import { Scene, type ViewState } from "./Scene";
 import { AnchorMap } from "./Workshop";
 import { AircraftInfo } from "./AircraftInfo";
@@ -29,6 +37,11 @@ export function SharedApp() {
   const [audio] = useState(() => new AircraftAudio());
   const [vr] = useState(() => new VrRuntime(e, audio));
   const [client] = useState(() => new RoomClient());
+  const [speech] = useState<SpeechOutput>(() => new RoomSpeech());
+  const speechState = useSyncExternalStore(
+    speech.subscribe,
+    () => speech.snapshot,
+  );
   const [playback] = useState(() => new SharedPlayback(e, () => audio.stop()));
   const room = useSyncExternalStore(client.subscribe, () => client.snapshot);
   const sceneState = useSyncExternalStore(e.subscribe, () => e.snapshot);
@@ -38,13 +51,8 @@ export function SharedApp() {
   const [selected, setSelected] = useState<FlightId | null>(null);
   const [resting, setResting] = useState(true);
   const [volume, setVolume] = useState(35);
-  const [qr, setQr] = useState("");
-  const [inviteUrl, setInviteUrl] = useState("");
-  const [visitorQr, setVisitorQr] = useState(true);
   const [note, setNote] = useState("");
-  const [page, setPage] = useState<
-    "main" | "edit" | "points" | "audio" | "view"
-  >("main");
+  const [page, setPage] = useState<SharedPage>("main");
   const [point, setPoint] = useState<"a" | "b">("a");
   const [, repaint] = useState(0);
   const recipe = room.state?.draft ?? DEFAULT_WORKSHOP;
@@ -69,10 +77,27 @@ export function SharedApp() {
         : room.status === "connecting"
           ? "接続しています…"
           : "共有への接続が切れています";
+  const facts = observeRoom(room.state, now, room.status === "connected");
+  const towerText = describeRoom(facts);
+  const canReadSituation =
+    speechState.available &&
+    room.status === "connected" &&
+    !!facts.draft &&
+    !resting &&
+    volume > 0;
+  const readSituation = () => {
+    const fresh = observeRoom(
+      client.snapshot.state,
+      client.now(),
+      client.snapshot.status === "connected",
+    );
+    if (!resting && volume > 0 && fresh.draft)
+      speech.say(describeRoom(fresh).spoken, volume / 100);
+  };
   const flightLabel = next
     ? `次の便まで ${Math.max(0, Math.ceil((next.startsAt - now) / 1000))}秒`
     : active
-      ? "同じ旅客機が飛行中です。"
+      ? towerText.title
       : visitor
         ? "運営が飛行を準備しています。"
         : "準備できたら、一緒に飛ばそう。";
@@ -121,6 +146,7 @@ export function SharedApp() {
     }
   };
   const rest = () => {
+    speech.stop();
     setResting(true);
     audio.stop();
   };
@@ -148,151 +174,45 @@ export function SharedApp() {
   vr.onLocalRest = rest;
   vr.onSelect = setSelected;
   vr.onClear = clear;
-  const buttons: SharedVrPanel["buttons"] = [];
-  const add = (label: string, press: () => void, allowed = true) => {
-    const n = buttons.length;
-    buttons.push({
-      label,
-      press,
-      enabled: allowed,
-      x: 30 + (n % 2) * 497,
-      y: 157 + Math.floor(n / 2) * 81,
-      w: 467,
-      h: 69,
-    });
-  };
-  if (page === "view") {
-    add(
-      vrState.displayMode === "ar" ? "仮想の空に戻る" : "現実に機体を重ねる",
-      () => vr.toggleEnvironment(),
-      vr.canShowAR,
-    );
-    add("操作盤を閉じて眺める", () => vr.hidePanel());
-    add("音の設定", () => setPage("audio"));
-    add("選択を外す", clear);
-    add("再接続", client.reconnect, room.status !== "connected");
-    add("空の操作へ", () => setPage("main"));
-    add("ブラウザに戻る", () => void vr.exit());
-  } else if (page === "main" && visitor) {
-    add("操作盤を閉じて眺める", () => vr.hidePanel());
-    add(resting ? "音を聴く" : "自分の音を休む", () =>
-      resting ? void listen() : rest(),
-    );
-    add("音の設定", () => setPage("audio"));
-    add("選択を外す", clear);
-    add("見え方・操作案内", () => setPage("view"));
-    add("ブラウザに戻る", () => void vr.exit());
-  } else if (page === "main") {
-    add(
-      exhibition
-        ? repeating
-          ? "繰り返しを止める"
-          : "展示の飛行を始める"
-        : next
-          ? "次の便を取り消す"
-          : active
-            ? "次の便を予約"
-            : "一緒に飛ばす",
-      () =>
-        exhibition
-          ? client.send({ type: "repeat", enabled: !repeating })
-          : next
-            ? client.send({ type: "cancel-next" })
-            : launch(),
-      enabled,
-    );
-    add(resting ? "音を聴く" : "自分の音を休む", () =>
-      resting ? void listen() : rest(),
-    );
-    add("機体・航路を変える", () => setPage("edit"), !!room.state);
-    add("2地点を動かす", () => setPage("points"), !!room.state);
-    add("音の設定", () => setPage("audio"));
-    add("選択を外す", clear);
-    add("見え方・操作案内", () => setPage("view"));
-    add("ブラウザに戻る", () => void vr.exit());
-  } else if (page === "edit") {
-    add(
-      `機体：${recipe.aircraft.engineCount}発 → 別の機体`,
-      () => {
-        const index = AIRCRAFT_PATTERNS.findIndex(
-          (p) => p.aircraft.bodyLengthM === recipe.aircraft.bodyLengthM,
-        );
-        update({
-          ...recipe,
-          aircraft: AIRCRAFT_PATTERNS[(index + 1) % 3].aircraft,
-        });
-      },
-      enabled,
-    );
-    add(
-      "別の航路にする",
-      () => {
-        const index = ROUTE_PATTERNS.findIndex(
-          (p) =>
-            p.route.seed === recipe.route.seed &&
-            p.route.altitudeM === recipe.route.altitudeM,
-        );
-        const pattern = ROUTE_PATTERNS[(index + 1) % 4];
-        update({ ...recipe, route: pattern.route, flight: pattern.flight });
-      },
-      enabled,
-    );
-    add("高度 −20 m", () => adjust("altitude", -20), enabled);
-    add("高度 ＋20 m", () => adjust("altitude", 20), enabled);
-    add("速度 −5 m/s", () => adjust("speed", -5), enabled);
-    add("速度 ＋5 m/s", () => adjust("speed", 5), enabled);
-    add("空の操作へ", () => setPage("main"));
-    add("2地点を動かす", () => setPage("points"));
-  } else if (page === "points") {
-    add(`A地点 ${point === "a" ? "選択中" : ""}`, () => setPoint("a"));
-    add(`B地点 ${point === "b" ? "選択中" : ""}`, () => setPoint("b"));
-    add("西へ 100 m", () => movePoint("x", -100), enabled);
-    add("東へ 100 m", () => movePoint("x", 100), enabled);
-    add("北へ 100 m", () => movePoint("z", -100), enabled);
-    add("南へ 100 m", () => movePoint("z", 100), enabled);
-    add("空の操作へ", () => setPage("main"));
-    add("機体・航路へ", () => setPage("edit"));
-  } else {
-    add("音量 −5", () => setVolume((v) => Math.max(0, v - 5)));
-    add("音量 ＋5", () => setVolume((v) => Math.min(70, v + 5)));
-    add("本体スピーカー向け", () => {
-      audio.setOutputProfile("speaker");
-      setNote("本体スピーカー向け");
-    });
-    add("ヘッドホン向け", () => {
-      audio.setOutputProfile("headphones");
-      setNote("ヘッドホン向け");
-    });
-    add(resting ? "音を聴く" : "自分の音を休む", () =>
-      resting ? void listen() : rest(),
-    );
-    add("空の操作へ", () => setPage("main"));
-  }
-  vr.sharedPanel = {
-    title:
-      page === "view"
-        ? "見え方・操作案内（自分だけ）"
-        : page === "main"
-          ? "AIRPLANEVOICE / 共有する空"
-          : page === "edit"
-            ? "次の機体・航路をつくる"
-            : page === "points"
-              ? "次の航路 / 2地点を動かす"
-              : "自分の音の設定",
-    status: room.error || note || `${status} / ${flightLabel}`,
-    detail:
-      page === "view"
-        ? vr.canShowAR
-          ? "移動せず眺めよう。切り替えても同じ便が続きます。"
-          : "この入場ではARに切り替えられません。"
-        : inspection?.visible && page === "main"
-          ? `${inspection.id} / ${Math.round(inspection.speedMps! * 3.6)} km/h / ${inspection.headingLabel} ${Math.round(inspection.headingDeg!)}°`
-          : page === "points"
-            ? `${point.toUpperCase()}：東西 ${recipe.route[point].x} m / 南北 ${recipe.route[point].z} m`
-            : `${recipe.aircraft.engineCount}発 / 高度 ${recipe.route.altitudeM} m / 速度 ${recipe.flight.speedMps} m/s / 音量 ${volume}%`,
-    buttons,
-    hint: "人差し指のトリガー：決定 ／ 側面のグリップ：操作盤を呼ぶ",
-  };
+  vr.sharedPanel = sharedPanel({
+    page,
+    setPage,
+    point,
+    setPoint,
+    room,
+    recipe,
+    vr,
+    vrState,
+    visitor,
+    exhibition,
+    repeating,
+    next,
+    active,
+    enabled,
+    resting,
+    listen,
+    rest,
+    launch,
+    clear,
+    update,
+    adjust,
+    movePoint,
+    volume,
+    setVolume,
+    audio,
+    client,
+    setNote,
+    note,
+    status,
+    flightLabel,
+    inspection,
+    towerLines: towerText.lines,
+    read: readSituation,
+    stopSpeech: speech.stop,
+    canRead: canReadSituation,
+    speaking: speechState.speaking,
+    speechMessage: speechState.message,
+  });
   const tick = () => {
     const state = client.snapshot.state;
     if (!state) return;
@@ -313,6 +233,10 @@ export function SharedApp() {
     }
   };
   useEffect(() => {
+    speech.stop();
+  }, [speech, facts.phase, facts.revision, vrState.status, volume]);
+  useEffect(() => () => speech.dispose(), [speech]);
+  useEffect(() => {
     audio.setVolume(volume / 100);
     audio.setMuted(resting);
   }, [audio, volume, resting]);
@@ -325,6 +249,7 @@ export function SharedApp() {
     const refresh = setInterval(() => repaint((n) => n + 1), 500);
     const hidden = () => {
       if (document.hidden) {
+        speech.stop();
         setResting(true);
         audio.stop();
       }
@@ -336,36 +261,7 @@ export function SharedApp() {
       audio.dispose();
       document.removeEventListener("visibilitychange", hidden);
     };
-  }, [client, audio]);
-  useEffect(() => {
-    if (!room.state || !client.id || room.role !== "editor") return;
-    let live = true;
-    setQr("");
-    setInviteUrl("");
-    void Promise.all([
-      import("qrcode"),
-      exhibition && visitorQr
-        ? client.visitorInvite()
-        : Promise.resolve(client.invite),
-    ])
-      .then(([QR, url]) => {
-        if (live) setInviteUrl(url);
-        return QR.toDataURL(url, {
-          width: 440,
-          margin: 3,
-          errorCorrectionLevel: "M",
-        });
-      })
-      .then((image) => {
-        if (live) setQr(image);
-      })
-      .catch(() => {
-        if (live) setNote("QRを生成できません。招待URLをコピーして渡せます。");
-      });
-    return () => {
-      live = false;
-    };
-  }, [client, !!room.state, room.role, exhibition, visitorQr]);
+  }, [client, audio, speech]);
   useEffect(() => {
     e.onArrival = (arrival, now) => {
       if (!resting && !document.hidden && vr.canAdvance)
@@ -389,6 +285,15 @@ export function SharedApp() {
             : null,
           now: client.now(),
         },
+        tower: {
+          ...observeRoom(
+            client.snapshot.state,
+            client.now(),
+            client.snapshot.status === "connected",
+          ),
+          speech: speech.snapshot,
+          source: "rules",
+        },
         playbackId: playback.flightId,
         resting,
         listener: e.listener,
@@ -404,7 +309,7 @@ export function SharedApp() {
       });
     // Shared time is server time. Local-only accelerated time would desynchronize peers.
     Reflect.deleteProperty(window, "advanceTime");
-  }, [e, audio, vr, client, playback, resting, selected]);
+  }, [e, audio, vr, client, playback, resting, selected, speech]);
   const download = () => {
     const url = URL.createObjectURL(
       new Blob([JSON.stringify(recipe, null, 2)], { type: "application/json" }),
@@ -420,7 +325,7 @@ export function SharedApp() {
       <header className="shared-header">
         <a href="./">音航跡 / AIRPLANEVOICE</a>
         <span>
-          共有する空 <small>v0.9.0</small>
+          共有する空 <small>v0.9.1</small>
         </span>
       </header>
       <div className="shared-layout">
@@ -559,6 +464,15 @@ export function SharedApp() {
                   ARを使わずVRで開く
                 </button>
               )}
+              <RoomTower
+                facts={facts}
+                speech={speechState}
+                canRead={canReadSituation}
+                onRead={readSituation}
+                onStop={speech.stop}
+                showDraft={!visitor}
+                resting={resting}
+              />
               <details className="room-guide">
                 <summary>Questでの操作案内</summary>
                 <p>
@@ -722,70 +636,13 @@ export function SharedApp() {
                       }}
                     />
                   </label>
-                  <details className="room-invite">
-                    <summary>
-                      {exhibition
-                        ? "展示のQR・編集者の招待"
-                        : "Quest・もう一台を招待"}
-                    </summary>
-                    {exhibition && (
-                      <label>
-                        招待する人
-                        <select
-                          aria-label="招待する人"
-                          value={visitorQr ? "visitor" : "editor"}
-                          onChange={(event) =>
-                            setVisitorQr(event.target.value === "visitor")
-                          }
-                        >
-                          <option value="visitor">来場者（観覧のみ）</option>
-                          <option value="editor">
-                            運営（飛行を編集できる）
-                          </option>
-                        </select>
-                      </label>
-                    )}
-                    {exhibition && (
-                      <p>
-                        {visitorQr
-                          ? "来場者用QR。展示時間中は何度でも入り直せます。"
-                          : "運営用です。来場者には観覧用QRを渡してください。"}
-                      </p>
-                    )}
-                    {qr && <img src={qr} alt="共有する部屋の招待QR" />}
-                    <input
-                      aria-label="部屋の招待URL"
-                      readOnly
-                      value={inviteUrl}
-                    />
-                    <button
-                      onClick={() => {
-                        void navigator.clipboard
-                          .writeText(inviteUrl)
-                          .then(() => setNote("招待URLをコピーしました。"))
-                          .catch(() =>
-                            setNote("URL欄を選択してコピーしてください。"),
-                          );
-                      }}
-                    >
-                      招待URLをコピー
-                    </button>
-                    <p>
-                      同じURLで入り直せます。部屋の期限は{" "}
-                      {new Date(room.state.expiresAt).toLocaleTimeString(
-                        "ja-JP",
-                      )}
-                      。QRの読み取りには{" "}
-                      <a
-                        href="https://xrqr.net/"
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        XRQR
-                      </a>{" "}
-                      も使えます。
-                    </p>
-                  </details>
+                  <RoomInvite
+                    key={client.id}
+                    client={client}
+                    exhibition={exhibition}
+                    expiresAt={room.state.expiresAt}
+                    onNote={setNote}
+                  />
                 </>
               )}
               {room.status !== "connected" && (

@@ -11,6 +11,7 @@ type VrStatus =
   "checking" | "unsupported" | "ready" | "entering" | "presenting";
 export interface SharedVrPanel {
   hint?: string;
+  lines?: string[];
   title: string;
   status: string;
   detail: string;
@@ -561,6 +562,12 @@ export class VrRuntime {
       ctx.font = "24px sans-serif";
       ctx.fillText(panel.status, 30, 90, 964);
       ctx.fillText(panel.detail, 30, 126, 964);
+      if (panel.lines) {
+        ctx.font = "25px sans-serif";
+        panel.lines
+          .slice(0, 4)
+          .forEach((line, i) => ctx.fillText(line, 30, 185 + i * 40, 964));
+      }
       for (const b of panel.buttons) {
         ctx.fillStyle = b.enabled === false ? "#1c373a" : "#36585b";
         ctx.fillRect(b.x, b.y, b.w, b.h);

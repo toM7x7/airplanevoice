@@ -160,6 +160,25 @@
 .room-guide summary {
   cursor: pointer;
 }
+.room-tower {
+  margin: 16px 0;
+  padding: 12px;
+  background: #e8eee3;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.room-tower summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.room-tower ul {
+  padding-left: 18px;
+}
+.room-tower small {
+  display: block;
+  color: #47645d;
+}
 .room-invite select {
   width: 100%;
   padding: 10px;

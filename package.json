@@ -1,6 +1,6 @@
 {
   "name": "sound-trail",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "private": true,
   "type": "module",
   "engines": {
@@ -28,6 +28,7 @@
     "check:worker": "wrangler types workers/worker-configuration.d.ts && tsc -p workers/tsconfig.json",
     "dev:shared": "wrangler dev",
     "test:shared": "node scripts/shared-check.mjs",
+    "test:tower": "node scripts/tower-check.mjs",
     "test:exhibition": "node scripts/exhibition-check.mjs && node scripts/exhibition-alarm-check.mjs",
     "deploy:shared": "npm run check:worker && npm run build && wrangler deploy"
   },
