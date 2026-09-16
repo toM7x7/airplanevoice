@@ -12,6 +12,7 @@ import { Aircraft } from "./Aircraft";
 import type { AircraftAudio } from "./audio";
 import type { VrRuntime } from "./vr";
 import { TrailVisibility } from "./trail-visibility";
+import { SkyEnvironment } from "./SkyEnvironment";
 
 export interface ViewState {
   yaw: number;
@@ -40,36 +41,6 @@ interface SceneProps {
 }
 const UP = new THREE.Vector3(0, 1, 0);
 const Z = new THREE.Vector3(0, 0, 1);
-
-function Sky() {
-  const material = useMemo(
-    () =>
-      new THREE.ShaderMaterial({
-        side: THREE.BackSide,
-        depthWrite: false,
-        vertexShader:
-          "varying vec3 vPosition; void main(){vPosition=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}",
-        fragmentShader: `varying vec3 vPosition;
-      void main() {
-        vec3 d = normalize(vPosition);
-        float h = max(0.0,d.y);
-        vec3 color = mix(vec3(0.59,0.75,0.79),vec3(0.035,0.23,0.46),pow(h,0.38));
-        float sun = pow(max(0.0,dot(d,normalize(vec3(-0.7,0.7,-1.0)))),100.0);
-        color += vec3(0.18,0.15,0.08)*sun;
-        gl_FragColor=vec4(color,1.0);
-        #include <tonemapping_fragment>
-        #include <colorspace_fragment>
-      }`,
-      }),
-    [],
-  );
-  useEffect(() => () => material.dispose(), [material]);
-  return (
-    <mesh material={material}>
-      <sphereGeometry args={[18000, 24, 16]} />
-    </mesh>
-  );
-}
 
 function Landscape() {
   return (
@@ -390,18 +361,14 @@ function World({
       triangles: gl.info.render.triangles,
       geometries: gl.info.memory.geometries,
       textures: gl.info.memory.textures,
+      appearance: "procedural-v2",
+      environment: scene.environment !== null,
     };
   });
   return (
     <>
-      <Sky />
-      <fog attach="fog" args={["#b9d0cd", 3000, 18000]} />
-      <hemisphereLight args={["#ebf5ff", "#667a60", 2.2]} />
-      <directionalLight
-        position={[-1500, 3500, 1800]}
-        intensity={3}
-        color="#fff3d7"
-      />
+      <SkyEnvironment />
+      <fog attach="fog" args={["#bfd2df", 3000, 18000]} />
       <Landscape />
       {AIRCRAFT.map((a, index) => (
         <group

@@ -2,7 +2,9 @@
 
 機体を作り、空に航路を描き、あとから届く音を待つ。
 
-**独立したWebアプリの検証版（v0.8.0）です。** Three.js / React Three Fiber、TypeScript、Web Audioで動きます。地上から旅客機を見上げ、遅れて届く音を聴く体験が原点です。
+**独立したWebアプリの検証版（v0.8.1）です。** Three.js / React Three Fiber、TypeScript、Web Audioで動きます。地上から旅客機を見上げ、遅れて届く音を聴く体験が原点です。
+
+**「見惚れる飛行」へ、光と機体をコードで改善。** 空の太陽と照明をそろえ、環境反射、連続した胴体曲面、厚みのある翼、奥行きのある吸気口を追加しました。寸法・双発／四発の編集を維持しています。通常距離の描画と近接モデルを分けて比較し、Quest実機での魅力・ちらつき・快適さはこれから評価します。[品質仕様と実装記録](docs/absorbing-flight.md)。
 
 **[共有する空を開く](https://airplanevoice-shared-sky.tomohaya-falcon-aramaki.workers.dev/?shared=1)** — PCで部屋を作り、招待URL／QRでQuestへ。両方から機体・航路・高度・速度・2地点を変え、共通の時刻で飛ばせます。飛行中の編集は次の便用。Cloudflare Freeで、まず1機・1時間の部屋を試作しました。ブラウザとQuest模擬の確認は実機試遊と分けています。[範囲と設計](docs/shared-sky.md) / [操作・配置手順](docs/deployment.md)。
 
@@ -47,6 +49,7 @@ npx playwright install chromium
 npm run test:browser
 npm run test:airspace
 npm run test:workshop
+npm run test:quality   # Vite上で同一飛行・モデル寸法の比較画像と状態を保存
 npm run test:observation
 npm run test:evolution
 npm run test:vr

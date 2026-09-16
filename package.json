@@ -1,6 +1,6 @@
 {
   "name": "sound-trail",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "private": true,
   "type": "module",
   "engines": {
@@ -24,6 +24,7 @@
     "test:trail": "node scripts/trail-visibility-check.mjs",
     "test:transfer": "node scripts/transfer-check.mjs",
     "test:show": "node scripts/show-check.mjs",
+    "test:quality": "node scripts/quality-check.mjs",
     "check:worker": "wrangler types workers/worker-configuration.d.ts && tsc -p workers/tsconfig.json",
     "dev:shared": "wrangler dev",
     "test:shared": "node scripts/shared-check.mjs",

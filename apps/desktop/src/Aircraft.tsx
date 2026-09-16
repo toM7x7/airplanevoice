@@ -1,38 +1,22 @@
-import { useLayoutEffect, useMemo, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import {
   DEFAULT_AIRCRAFT,
   type AircraftDesign,
 } from "../../../packages/core/src";
+import {
+  bodySurface,
+  cockpitGeometry,
+  exhaustGeometry,
+  fuselageGeometry,
+  intakeGeometry,
+  intakeLipGeometry,
+  nacelleGeometry,
+  spinnerGeometry,
+  wingGeometry,
+} from "./aircraft-geometry";
 
-function wingGeometry(side: number, tail = false) {
-  const shape = new THREE.Shape();
-  const pts = tail
-    ? [
-        [2, -22],
-        [14, -29],
-        [13, -31],
-        [2, -29],
-      ]
-    : [
-        [2.5, 6],
-        [31, -9],
-        [32, -13],
-        [9, -9],
-        [2.5, -12],
-      ];
-  pts.forEach(([x, z], i) =>
-    i === 0 ? shape.moveTo(x * side, z) : shape.lineTo(x * side, z),
-  );
-  shape.closePath();
-  const g = new THREE.ExtrudeGeometry(shape, {
-    depth: tail ? 0.45 : 0.75,
-    bevelEnabled: false,
-  });
-  g.rotateX(Math.PI / 2);
-  return g;
-}
 export function Aircraft({
   accent = "#205963",
   design = DEFAULT_AIRCRAFT,
@@ -40,24 +24,111 @@ export function Aircraft({
   accent?: string;
   design?: AircraftDesign;
 }) {
+  const root = useRef<THREE.Group>(null);
   const details = useRef<THREE.Group>(null);
   const windows = useRef<THREE.InstancedMesh>(null);
-  const worldPosition = useMemo(() => new THREE.Vector3(), []);
-  const viewerPosition = useMemo(() => new THREE.Vector3(), []);
-  const lengthScale = design.bodyLengthM / 71,
-    spanScale = design.wingSpanM / 64;
-  const engines = [-1, 1].flatMap((side) =>
-    (design.engineCount === 4 ? [13, 23] : [16]).map((x, i) => ({
-      x: side * x * spanScale,
-      z: -i * 5,
-    })),
+  const engineParts = useRef<(THREE.InstancedMesh | null)[]>([]);
+  const positions = useMemo(
+    () => ({ plane: new THREE.Vector3(), eye: new THREE.Vector3() }),
+    [],
+  );
+  const shape = useMemo(
+    () => ({
+      body: fuselageGeometry(),
+      left: wingGeometry(-1),
+      right: wingGeometry(1),
+      tailLeft: wingGeometry(-1, "tail"),
+      tailRight: wingGeometry(1, "tail"),
+      fin: wingGeometry(1, "fin"),
+      nacelle: nacelleGeometry(),
+      lip: intakeLipGeometry(),
+      intake: intakeGeometry(),
+      exhaust: exhaustGeometry(),
+      spinner: spinnerGeometry(),
+      cockpit: cockpitGeometry(),
+      window: new THREE.SphereGeometry(1, 8, 6),
+      fairing: new THREE.SphereGeometry(1, 24, 12),
+      pylon: new THREE.BoxGeometry(0.48, 1, 1),
+      light: new THREE.SphereGeometry(0.25, 8, 6),
+    }),
+    [],
+  );
+  const materials = useMemo(
+    () => ({
+      paint: new THREE.MeshStandardMaterial({
+        color: "#eceeea",
+        roughness: 0.3,
+        metalness: 0,
+        vertexColors: true,
+      }),
+      shell: new THREE.MeshStandardMaterial({
+        color: "#e5e9e8",
+        roughness: 0.3,
+        metalness: 0,
+      }),
+      wing: new THREE.MeshStandardMaterial({
+        color: "#c7d1d6",
+        roughness: 0.35,
+        metalness: 0.18,
+      }),
+      lip: new THREE.MeshStandardMaterial({
+        color: "#bdc8cf",
+        roughness: 0.26,
+        metalness: 0.88,
+      }),
+      dark: new THREE.MeshStandardMaterial({
+        color: "#17212a",
+        roughness: 0.8,
+        metalness: 0.1,
+      }),
+      exhaust: new THREE.MeshStandardMaterial({
+        color: "#59636b",
+        roughness: 0.48,
+        metalness: 0.75,
+      }),
+      glass: new THREE.MeshStandardMaterial({
+        color: "#183342",
+        roughness: 0.24,
+        metalness: 0.22,
+        side: THREE.DoubleSide,
+      }),
+      tail: new THREE.MeshStandardMaterial({ roughness: 0.33 }),
+      windows: new THREE.MeshStandardMaterial({
+        color: "#24404d",
+        roughness: 0.55,
+        metalness: 0,
+        envMapIntensity: 0.15,
+        transparent: true,
+        depthWrite: false,
+      }),
+      red: new THREE.MeshBasicMaterial({ color: "#cb5550" }),
+      green: new THREE.MeshBasicMaterial({ color: "#73b897" }),
+    }),
+    [],
+  );
+  useLayoutEffect(() => {
+    materials.tail.color.set(accent);
+  }, [materials, accent]);
+  useLayoutEffect(() => {
+    const instances = [windows.current, ...engineParts.current];
+    return () => instances.forEach((mesh) => mesh?.dispose());
+  }, []);
+  // This instance owns the reusable geometry/materials. Edits only transform them.
+  useEffect(
+    () => () => {
+      Object.values(shape).forEach((g) => g.dispose());
+      Object.values(materials).forEach((m) => m.dispose());
+    },
+    [shape, materials],
   );
   useLayoutEffect(() => {
     const dummy = new THREE.Object3D();
     [-1, 1].forEach((side, j) => {
       for (let i = 0; i < 26; i++) {
-        dummy.position.set(side * 3.18, 1.2, -18 + i * 1.65);
-        dummy.scale.set(0.1, 0.42, 0.3);
+        const angle = side === 1 ? 0.32 : Math.PI - 0.32;
+        dummy.position.copy(bodySurface(-18 + i * 1.65, angle, 0.035));
+        dummy.rotation.set(0, 0, side * 0.32);
+        dummy.scale.set(0.045, 0.36, 0.245);
         dummy.updateMatrix();
         windows.current!.setMatrixAt(j * 26 + i, dummy.matrix);
       }
@@ -66,133 +137,103 @@ export function Aircraft({
     windows.current!.computeBoundingSphere();
   }, []);
   useFrame(({ camera, gl }) => {
-    if (!details.current) return;
-    details.current.getWorldPosition(worldPosition);
-    const scale =
+    if (!root.current || !details.current) return;
+    root.current.getWorldPosition(positions.plane);
+    camera.getWorldPosition(positions.eye);
+    const fovScale =
       !gl.xr.isPresenting && camera instanceof THREE.PerspectiveCamera
-        ? Math.tan((camera.fov * Math.PI) / 360) /
-          Math.tan((29 * Math.PI) / 180)
+        ? Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) /
+          Math.tan(THREE.MathUtils.degToRad(29))
         : 1;
-    camera.getWorldPosition(viewerPosition);
-    const effectiveDistance = worldPosition.distanceTo(viewerPosition) * scale;
-    details.current.visible =
-      effectiveDistance < (details.current.visible ? 1700 : 1450);
+    const distance = positions.plane.distanceTo(positions.eye) * fovScale;
+    // Fade subpixel windows; solid intakes and cockpit retain their silhouette.
+    const fade = 1 - THREE.MathUtils.smoothstep(distance, 700, 1500);
+    materials.windows.opacity = fade;
+    details.current.visible = fade > 0.001;
   });
-  const body = useMemo(
-    () =>
-      new THREE.LatheGeometry(
-        [
-          new THREE.Vector2(0.25, -35),
-          new THREE.Vector2(1.3, -31),
-          new THREE.Vector2(2.8, -20),
-          new THREE.Vector2(3.25, -9),
-          new THREE.Vector2(3.3, 20),
-          new THREE.Vector2(2.8, 28),
-          new THREE.Vector2(1.8, 33),
-          new THREE.Vector2(0.1, 36),
-        ],
-        24,
-      ),
-    [],
-  );
-  const wings = useMemo(
-    () => [
-      wingGeometry(-1),
-      wingGeometry(1),
-      wingGeometry(-1, true),
-      wingGeometry(1, true),
-    ],
-    [],
-  );
-  const fin = useMemo(() => {
-    const shape = new THREE.Shape();
-    shape.moveTo(-0.2, -32);
-    shape.lineTo(0, -20);
-    shape.lineTo(11, -31);
-    shape.lineTo(11, -35);
-    shape.lineTo(0, -34);
-    const g = new THREE.ExtrudeGeometry(shape, {
-      depth: 0.65,
-      bevelEnabled: false,
+  const lengthScale = design.bodyLengthM / 71,
+    spanScale = design.wingSpanM / 64;
+  const engineScale = design.engineCount === 2 ? 1.17 : 1;
+  useLayoutEffect(() => {
+    const engines = [-1, 1].flatMap((side) =>
+      (design.engineCount === 4 ? [13, 23] : [16]).map((x) => ({
+        x: side * x * spanScale,
+        z: 1.5 - (x - 12) * 0.61 - 2,
+        wingY: -0.1 + (x - 12) * 0.085,
+      })),
+    );
+    const dummy = new THREE.Object3D();
+    engineParts.current.forEach((mesh, part) => {
+      if (!mesh) return;
+      engines.forEach((engine, i) => {
+        if (part === 0) {
+          dummy.position.set(engine.x, engine.wingY - 0.9, engine.z - 1.2);
+          dummy.scale.set(1, 1.8, 3.5);
+        } else {
+          dummy.position.set(
+            engine.x,
+            engine.wingY - 2.6 * engineScale,
+            engine.z,
+          );
+          dummy.scale.setScalar(engineScale);
+        }
+        dummy.updateMatrix();
+        mesh.setMatrixAt(i, dummy.matrix);
+      });
+      mesh.count = engines.length;
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.computeBoundingSphere();
     });
-    g.rotateY(Math.PI / 2);
-    g.rotateX(Math.PI / 2);
-    return g;
-  }, []);
+  }, [design.engineCount, spanScale, engineScale]);
   return (
-    <group scale={[1, 1, lengthScale]}>
-      <mesh geometry={body} rotation={[Math.PI / 2, 0, 0]}>
-        <meshStandardMaterial
-          color="#e8e6dc"
-          roughness={0.55}
-          metalness={0.15}
-        />
-      </mesh>
-      <mesh position={[0, 2.1, 17]} scale={[2.85, 1.8, 10]}>
-        <sphereGeometry args={[1, 20, 12]} />
-        <meshStandardMaterial color="#e5e4dd" />
-      </mesh>
+    <group ref={root} scale={[1, 1, lengthScale]} dispose={null}>
+      <mesh geometry={shape.body} material={materials.paint} />
+      <mesh
+        geometry={shape.fairing}
+        material={materials.shell}
+        position={[0, -2.5, -3.5]}
+        scale={[3.2, 1.15, 10]}
+      />
       <group scale={[spanScale, 1, 1]}>
-        {wings.map((g, i) => (
-          <mesh key={i} geometry={g} position={[0, i < 2 ? -0.9 : 0.7, 0]}>
-            <meshStandardMaterial
-              color={i < 2 ? "#c4cdd0" : "#d2dbdc"}
-              metalness={0.3}
-              roughness={0.45}
-              side={THREE.DoubleSide}
-            />
-          </mesh>
-        ))}
+        {[shape.left, shape.right, shape.tailLeft, shape.tailRight].map(
+          (g, i) => (
+            <mesh key={i} geometry={g} material={materials.wing} />
+          ),
+        )}
       </group>
-      <mesh geometry={fin} position={[0, 1.5, 0]}>
-        <meshStandardMaterial color={accent} side={THREE.DoubleSide} />
-      </mesh>
-      {engines.map((engine, i) => (
-        <group key={i} position={[engine.x, -3.6, engine.z]}>
-          <mesh rotation={[Math.PI / 2, 0, 0]}>
-            <cylinderGeometry args={[1.5, 1.15, 7, 20]} />
-            <meshStandardMaterial
-              color="#d4d9d8"
-              metalness={0.4}
-              roughness={0.4}
-            />
-          </mesh>
-          <mesh position={[0, 1.8, -0.5]}>
-            <boxGeometry args={[0.55, 2.8, 3.3]} />
-            <meshStandardMaterial color="#ccd4d3" />
-          </mesh>
-        </group>
+      <mesh geometry={shape.fin} material={materials.tail} />
+      <mesh geometry={shape.cockpit} material={materials.glass} />
+      {(
+        [
+          [shape.pylon, materials.wing],
+          [shape.nacelle, materials.shell],
+          [shape.lip, materials.lip],
+          [shape.intake, materials.dark],
+          [shape.exhaust, materials.exhaust],
+          [shape.spinner, materials.exhaust],
+        ] as const
+      ).map(([geometry, material], i) => (
+        <instancedMesh
+          key={i}
+          args={[geometry, material, 4]}
+          ref={(mesh) => {
+            engineParts.current[i] = mesh;
+          }}
+        />
       ))}
       <group ref={details}>
-        {engines.map((engine, i) => (
-          <group key={i} position={[engine.x, -3.6, engine.z]}>
-            <mesh position={[0, 0, 3.52]}>
-              <circleGeometry args={[1.26, 20]} />
-              <meshStandardMaterial color="#25353d" side={THREE.DoubleSide} />
-            </mesh>
-            <mesh position={[0, 0, 3.58]}>
-              <sphereGeometry args={[0.43, 12, 8]} />
-              <meshStandardMaterial color="#7c888c" />
-            </mesh>
-          </group>
-        ))}
-        <instancedMesh ref={windows} args={[undefined, undefined, 52]}>
-          <sphereGeometry args={[1, 6, 4]} />
-          <meshBasicMaterial color="#36535f" />
-        </instancedMesh>
-        <mesh position={[0, 3.2, 27.1]} scale={[2.2, 0.6, 1.35]}>
-          <sphereGeometry args={[1, 16, 8]} />
-          <meshStandardMaterial color="#234553" />
-        </mesh>
+        <instancedMesh
+          ref={windows}
+          args={[shape.window, materials.windows, 52]}
+        />
       </group>
       {[-1, 1].map((side) => (
         <mesh
-          key={`light-${side}`}
-          position={[side * 31 * spanScale, -0.7, -11]}
-        >
-          <sphereGeometry args={[0.45, 8, 6]} />
-          <meshBasicMaterial color={side < 0 ? "#e36c58" : "#9dd8bd"} />
-        </mesh>
+          key={side}
+          geometry={shape.light}
+          material={side < 0 ? materials.red : materials.green}
+          position={[side * 31.6 * spanScale, 2.53, -11.8]}
+        />
       ))}
     </group>
   );

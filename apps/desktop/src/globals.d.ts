@@ -6,6 +6,8 @@ interface Window {
     triangles: number;
     geometries: number;
     textures: number;
+    appearance: "procedural-v2";
+    environment: boolean;
   };
   __soundTrailTargets?: import("./Scene").AircraftTarget[];
 }

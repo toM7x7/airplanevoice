@@ -1,8 +1,10 @@
 # 公開先・クラウド構成・展示会の予備動作
 
-更新: 2026-09-16 / v0.8.0
+更新: 2026-09-16 / v0.8.1
 
 ## 現在の公開先
+
+v0.8.1で光・環境反射・コード生成機体を改善した。Cloudflare配置版IDは`432488c9-4ba1-4985-91de-09ddacf9e54c`。契約・WorkerのAPI・保存形式は変更していない。[品質の実装記録とQuestで残る評価](absorbing-flight.md#10-v081の実装記録)。
 
 - [共同編集・飛行を試す](https://airplanevoice-shared-sky.tomohaya-falcon-aramaki.workers.dev/?shared=1)：Cloudflare Workers＋SQLite型Durable Objects。アプリとAPIは同一オリジン。
 - [従来の単体版](https://tom7x7.github.io/airplanevoice/)：GitHub Pages。設定URL／QR・単体オフライン体験を保持し、共同編集へリンクする。
