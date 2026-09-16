@@ -109,9 +109,30 @@ try {
   await settle(a);
   assert.equal((await state(a)).room.state.venue.points[0].name, "受付");
   await a.getByRole("button", { name: "基準点を見る", exact: true }).click();
-  await a.getByRole("button", { name: "会場の地点を空間に表示" }).click();
+  await a.getByRole("button", { name: "実寸の地点を見る" }).click();
   await a.screenshot({ path: `${out}/01-map.png` });
   ok("PC registers and saves the measured coordinate map");
+  const beforeOverview = await state(a);
+  await a.getByRole("button", { name: "小さな地図で見る" }).click();
+  await wait(
+    a,
+    () => JSON.parse(window.render_game_to_text()).vr.venueView === "overview",
+  );
+  await a.waitForTimeout(800);
+  const afterOverview = await state(a);
+  assert.equal(
+    afterOverview.room.state.revision,
+    beforeOverview.room.state.revision,
+  );
+  assert.deepEqual(
+    afterOverview.room.state.venue,
+    beforeOverview.room.state.venue,
+  );
+  assert.deepEqual(afterOverview.audio.listener, beforeOverview.audio.listener);
+  await a.screenshot({ path: `${out}/01b-overview.png` });
+  await a.getByRole("button", { name: "地図を隠す", exact: true }).click();
+  assert.equal((await state(a)).vr.showVenue, false);
+  ok("PC overview and hide preserve shared coordinates, revision and listener");
   await a.locator("#shared-launch").click();
   await settle(a);
   const flight = (await state(a)).room.state.flights[0];
@@ -202,6 +223,58 @@ try {
   assert.deepEqual((await state(b)).room.state.flights[0], flight);
   ok(
     "VR destination selection syncs to PC and the other Quest without restarting the flight",
+  );
+  await button(b, 1, 1); // venue → venue-view (3 points)
+  assert.match((await state(b)).vr.sharedPage, /会場の見え方/);
+  const beforeMap = await state(b);
+  const beforePeer = await state(c);
+  await button(b, 0, 0); // overview, panel closes
+  await frames(b);
+  let afterMap = await state(b);
+  assert.equal(afterMap.vr.venueView, "overview");
+  assert.equal(afterMap.vr.panelVisible, false);
+  assert.equal(afterMap.vr.showVenue, true);
+  assert.deepEqual(afterMap.vr.alignment, beforeMap.vr.alignment);
+  assert.deepEqual(afterMap.audio.listener, beforeMap.audio.listener);
+  assert.deepEqual(afterMap.room.state.flights[0], flight);
+  assert.equal(afterMap.room.state.revision, beforeMap.room.state.revision);
+  assert.deepEqual(afterMap.room.state.venue, beforeMap.room.state.venue);
+  assert((await state(b)).room.now > beforeMap.room.now);
+  assert.equal((await state(c)).vr.showVenue, beforePeer.vr.showVenue);
+  await b.screenshot({ path: `${out}/03b-xr-overview.png` });
+  await b.evaluate(() =>
+    xrDevice.controllers.right.updateButtonValue("squeeze", 1),
+  );
+  await frames(b);
+  await b.evaluate(() =>
+    xrDevice.controllers.right.updateButtonValue("squeeze", 0),
+  );
+  await frames(b);
+  assert.equal((await state(b)).vr.panelVisible, true);
+  await button(b, 1, 1); // AR → virtual, preserving the map
+  assert.equal((await state(b)).vr.displayMode, "vr");
+  await button(b, 1, 3); // hide panel to see the map in the virtual sky
+  await frames(b);
+  await b.screenshot({ path: `${out}/03c-xr-overview-vr.png` });
+  await b.evaluate(() =>
+    xrDevice.controllers.right.updateButtonValue("squeeze", 1),
+  );
+  await frames(b);
+  await b.evaluate(() =>
+    xrDevice.controllers.right.updateButtonValue("squeeze", 0),
+  );
+  await frames(b);
+  await button(b, 1, 1); // back to AR
+  assert.equal((await state(b)).vr.displayMode, "ar");
+  await button(b, 1, 0); // same shared map at actual metres
+  afterMap = await state(b);
+  assert.equal(afterMap.vr.venueView, "space");
+  assert.deepEqual(afterMap.vr.alignment, beforeMap.vr.alignment);
+  assert.deepEqual(afterMap.audio.listener, beforeMap.audio.listener);
+  await button(b, 0, 1); // hide
+  assert.equal((await state(b)).vr.showVenue, false);
+  ok(
+    "XR miniature, full-scale and hidden views keep flight, calibration and ears unchanged; peers keep their view",
   );
   await button(c, 1, 2); // toggle AR → virtual
   assert.equal((await state(c)).vr.displayMode, "vr");

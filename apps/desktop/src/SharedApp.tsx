@@ -339,7 +339,7 @@ export function SharedApp() {
       <header className="shared-header">
         <a href="./">音航跡 / AIRPLANEVOICE</a>
         <span>
-          共有する空 <small>v0.10.0</small>
+          共有する空 <small>v0.11.0</small>
         </span>
       </header>
       <div className="shared-layout">

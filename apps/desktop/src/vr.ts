@@ -86,6 +86,8 @@ export class VrRuntime {
     calibrationMessage: "位置合わせは端末ごとに行います。",
     showCalibration: false,
     showVenue: false,
+    venueView: "space" as "overview" | "space",
+    overviewPlacement: 0,
   };
   private sessionMode: XRSessionMode | null = null;
   private floor: THREE.Mesh | null = null;
@@ -303,6 +305,24 @@ export class VrRuntime {
   hidePanel() {
     if (this.panel) this.panel.visible = false;
   }
+  get panelVisible() {
+    return this.panel?.visible ?? false;
+  }
+  /** A local presentation choice; never changes the rig, listener or room. */
+  showVenue(view: "overview" | "space") {
+    this.snapshot = {
+      ...this.snapshot,
+      showVenue: true,
+      venueView: view,
+      overviewPlacement: this.snapshot.overviewPlacement + 1,
+    };
+    if (view === "overview") this.hidePanel();
+    this.state(this.snapshot.status);
+  }
+  hideVenue() {
+    this.snapshot = { ...this.snapshot, showVenue: false };
+    this.state(this.snapshot.status);
+  }
   setTableFrame(key: string, frame: TableFrame) {
     const nextKey = `${key}/${frame.baselineM}/${frame.tableHeightM}`;
     if (this.frameKey === nextKey) return;
@@ -322,10 +342,6 @@ export class VrRuntime {
       ...this.snapshot,
       showCalibration: !this.snapshot.showCalibration,
     };
-    this.state(this.snapshot.status);
-  }
-  toggleVenue() {
-    this.snapshot = { ...this.snapshot, showVenue: !this.snapshot.showVenue };
     this.state(this.snapshot.status);
   }
   beginAlignment() {

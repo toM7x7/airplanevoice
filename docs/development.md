@@ -1,5 +1,14 @@
 # 開発と検証
 
+## v0.11.0の追加
+
+- `venue-overview.ts`はm座標から配置図へ等方変換する表示専用関数。原点Aを含めて全地点を収める。部屋データに縮尺を書き戻さない。
+- `VenueOverview`はCanvasTexture1枚と最大4つのマーカー。開いた前方へ置き、頭へ追従させない。XR操作盤を出す間は隠し、閉じると図へ戻す。
+- `VrRuntime.showVenue/hideVenue`は端末内の表示状態のみを更新。共通時計、音、校正、共有データは変更しない。PCとXRは同じ操作を使う。
+- `tests/venue-overview.test.ts`で縮尺・範囲・非破壊、`scripts/spatial-check.mjs`でPC／Quest模擬の表示切り替えと共有・耳・校正の維持を検証する。
+- 全体構想と今回の境界は[再設計書](experience-redesign.md)。以下の古い版の説明は当時の範囲。現在は共有ルーム、手動校正、端末読み上げも実装済み。
+
+
 ## v0.7.0の追加
 
 - `show.ts`は各機のWorkshopRecipeと開始秒をまとめて検証・コンパイル。Experienceの演目モードから既存のFlightPlan／ArrivalQueueへ接続する。通常の単体航路・自動変化は維持。

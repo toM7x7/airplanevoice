@@ -20,6 +20,7 @@ import type { VrRuntime } from "./vr";
 import { TrailVisibility } from "./trail-visibility";
 import { SkyEnvironment } from "./SkyEnvironment";
 import { VenueWorld } from "./VenueWorld";
+import { VenueOverview } from "./VenueOverview";
 import type { VenueMap } from "../../../packages/core/src/venue";
 
 export interface ViewState {
@@ -384,12 +385,19 @@ function World({
       <group visible={!passthrough}>
         <Landscape />
       </group>
+      {venue && xr.showVenue && xr.venueView === "overview" && (
+        <VenueOverview
+          venue={venue}
+          vr={vr}
+          placement={`${xr.status}/${xr.calibration}/${xr.overviewPlacement}`}
+        />
+      )}
       <group visible={vr.worldVisible}>
         {venue && (
           <VenueWorld
             venue={venue}
             markers={xr.showCalibration}
-            map={xr.showVenue}
+            map={xr.showVenue && xr.venueView === "space"}
           />
         )}
         {AIRCRAFT.map((a, index) => (

@@ -67,14 +67,29 @@ export function VenuePanel({
       </svg>
       <div className="shared-actions">
         <button
+          aria-pressed={
+            vr.snapshot.showVenue && vr.snapshot.venueView === "overview"
+          }
+          onClick={() => vr.showVenue("overview")}
+        >
+          小さな地図で見る
+        </button>
+        <button
+          aria-pressed={
+            vr.snapshot.showVenue && vr.snapshot.venueView === "space"
+          }
           onClick={() => {
-            vr.toggleVenue();
+            vr.showVenue("space");
             onLook();
           }}
         >
-          {vr.snapshot.showVenue
-            ? "会場の地点を隠す"
-            : "会場の地点を空間に表示"}
+          実寸の地点を見る
+        </button>
+        <button
+          disabled={!vr.snapshot.showVenue}
+          onClick={() => vr.hideVenue()}
+        >
+          地図を隠す
         </button>
         <button
           onClick={() => {
@@ -85,6 +100,11 @@ export function VenuePanel({
           {vr.snapshot.showCalibration ? "基準点を隠す" : "基準点を見る"}
         </button>
       </div>
+      <p>
+        小さな地図は目の前の配置図です。実寸表示は登録した距離で重ねます。
+        ARで現地に合わせるには、各Questで机の位置合わせを行ってください。
+        地図を縮めても飛行と音は変わりません。会場図の画像はまだ未登録です。
+      </p>
       <p role="status">{vr.snapshot.calibrationMessage}</p>
       <p>
         机にA・Bを{Math.round(venue.baselineM * 100)}{" "}

@@ -387,7 +387,7 @@ export function App() {
       [
         JSON.stringify(
           {
-            version: "0.10.0",
+            version: "0.11.0",
             platform: vr.diagnostics.frames > 0 ? "webxr-standalone" : "web",
             route: e.spec,
             aircraftDesign: e.aircraftDesign,
@@ -1056,7 +1056,7 @@ export function App() {
         >
           音・表示の設定 <span>{diagnostics ? "−" : "+"}</span>
         </button>
-        <span className="version">WORKSHOP · v0.10.0</span>
+        <span className="version">WORKSHOP · v0.11.0</span>
       </footer>
       {transfer && (
         <SkyTransfer
