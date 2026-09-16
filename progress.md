@@ -11,6 +11,7 @@ Original prompt: 空repo https://github.com/toM7x7/airplanevoice — 資料を�
 - Workerの型確認、公開dry-run、WEB_GAME_CLIENTの画面・状態確認も完了。PC・模擬XR・狭い画面の画像を確認。モジュールのtypeに関する共有スキル側のNode警告と従来のJSチャンクサイズ警告は継続。出力はoutput/tower、shared、exhibition-v091、game-client-v091。
 - Cloudflareの既存Workerへ配置済み。版ID `c095e3e8-f839-421e-9c9c-76da4e3f4d58`。追加の課金API・binding・契約変更なし。新機能の実際の声とQuest聴感は人による確認待ち。
 - Cloudflare公開版でも新規管制6項目が合格（output/tower-public-v091）。実装コミット `0b3b769` のCI（35062601475）は成功。公開検証の音声もモックであり、外部AI推論・音声APIは呼び出していない。
+- 実装コミットのPages公開（35062601526）も成功。検証用ローカルサーバーは終了。終了時に回収した開発サーバーのログに、SQLiteのSQLITE_BUSYとalarm取り消し警告が残っていた。途中に複数回の開発再読み込みがあり、正確な再現条件は未特定。上記ブラウザ試験は合格しているが、このログをエラーなしとは扱わない。次のローカルalarm検証は専用の永続化ディレクトリで再読み込みを避けて切り分ける。今回の公開版管制6項目とは区別して記録。
 
 ## 2026-09-16 v0.9.0 展示入口・観覧権限・基本AR
 
