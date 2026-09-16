@@ -15,6 +15,8 @@ Original prompt: 空repo https://github.com/toM7x7/airplanevoice — 資料を�
 - 起動前に8787/5173の待受なしを確認。このターンのWranglerはoutput/spatial-devを専用の保存先として利用。
 - 既存の展示入口・QR復号・観覧権限・継続飛行・AR往復・拒否後のVR復帰の8項目が合格（output/exhibition-v010）。alarmの実装変更はなく、長時間の繰り返し試験は今回は追加していない。
 - 既存Cloudflare Workerへv0.10.0を配置。版ID d33c60b9-5032-4dab-abbe-42a4d7841796。既存2つのDurable ObjectsとAssetsのまま、契約・有料API・binding追加なし。
+- Cloudflare公開版でも新規7項目が合格（output/spatial-public-v010）。校正後のAudioListenerの位置・向きの一致も確認。実機のパススルー・精度・聴感の結果ではない。
+- 実装コミットa86744dのCI 35105023071とPages公開35105022991が成功。Pagesがv0.10.0のアセットindex-DAQijdII.jsを配信していることを確認。検証用に起動したローカルWranglerは終了。
 - 実測した会場全体、図面画像、ブース間飛行、専用管理権限、MCP・LLMは後続。新しい実機受入T1〜T4は0/4のまま。
 
 ## 2026-09-16 実飛行データ＋PLATEAUの発展メモ、端末構成の訂正

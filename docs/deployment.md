@@ -4,7 +4,7 @@
 
 ## 現在の公開先
 
-v0.10.0のCloudflare版ID: `d33c60b9-5032-4dab-abbe-42a4d7841796`。ユニット114件、位置合わせ7項目、展示入口8項目、従来VR模擬23項目と型検査・ビルド・dry-runを確認して配置。実機の位置一致と負荷は未確認。
+v0.10.0のCloudflare版ID: `d33c60b9-5032-4dab-abbe-42a4d7841796`。ユニット114件、位置合わせ7項目、展示入口8項目、従来VR模擬23項目と型検査・ビルド・dry-runを確認して配置。実機の位置一致と負荷は未確認。公開版でも新規7項目が合格（`output/spatial-public-v010`）。実装コミット`a86744d`の[CI](https://github.com/toM7x7/airplanevoice/actions/runs/35105023071)・[Pages公開](https://github.com/toM7x7/airplanevoice/actions/runs/35105022991)も成功し、Pagesの配信アセットも確認。
 
 v0.10.0で机の手動位置合わせと会場地点の共有を追加。[操作手順・実機受入](table-alignment.md)。`npm run test:spatial`でPC＋模擬Quest 3／2を検証。`SHARED_URL`と`SPATIAL_OUTPUT`で接続先・保存先を指定できる。
 
