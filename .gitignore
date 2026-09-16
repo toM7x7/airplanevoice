@@ -9,3 +9,7 @@ output/
 .env.*
 !.env.example
 .DS_Store
+.wrangler/
+.dev.vars*
+workers/worker-configuration.d.ts
+*.cpuprofile

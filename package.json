@@ -1,6 +1,6 @@
 {
   "name": "sound-trail",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -23,7 +23,11 @@
     "test:audio": "node scripts/audio-output-check.mjs",
     "test:trail": "node scripts/trail-visibility-check.mjs",
     "test:transfer": "node scripts/transfer-check.mjs",
-    "test:show": "node scripts/show-check.mjs"
+    "test:show": "node scripts/show-check.mjs",
+    "check:worker": "wrangler types workers/worker-configuration.d.ts && tsc -p workers/tsconfig.json",
+    "dev:shared": "wrangler dev",
+    "test:shared": "node scripts/shared-check.mjs",
+    "deploy:shared": "npm run check:worker && npm run build && wrangler deploy"
   },
   "dependencies": {
     "@react-three/fiber": "^9.7.0",
@@ -45,6 +49,7 @@
     "prettier": "^3.9.6",
     "typescript": "^7.0.2",
     "vite": "^8.3.0",
-    "vitest": "^5.0.0"
+    "vitest": "^5.0.0",
+    "wrangler": "^4.132.0"
   }
 }

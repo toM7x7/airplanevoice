@@ -36,6 +36,7 @@ interface SceneProps {
   selectedId: FlightId | null;
   onSelect: (id: FlightId) => void;
   onClear: () => void;
+  onFrame?: () => void;
 }
 const UP = new THREE.Vector3(0, 1, 0);
 const Z = new THREE.Vector3(0, 0, 1);
@@ -124,6 +125,7 @@ function World({
   manual,
   reduced,
   selectedId,
+  onFrame,
   targets,
   marker,
 }: SceneProps & {
@@ -253,7 +255,9 @@ function World({
       temp.up.set(0, 1, 0).applyQuaternion(camera.quaternion);
       audio.setListener(e.listener, temp.forward, temp.up);
     }
-    if (!manual.current && vr.canAdvance) e.advance(Math.min(dt * 1000, 250));
+    if (onFrame) onFrame();
+    else if (!manual.current && vr.canAdvance)
+      e.advance(Math.min(dt * 1000, 250));
     vr.draw(selectedId, soundOn);
     const visibleTargets: AircraftTarget[] = [];
     aircraft.current.forEach((mesh, index) => {

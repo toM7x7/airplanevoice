@@ -1,0 +1,224 @@
+.shared-app {
+  min-height: 100dvh;
+  background: #f4f3e8;
+  color: #173f42;
+}
+.shared-header {
+  height: 70px;
+  padding: 0 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #cad4c7;
+}
+.shared-header a {
+  color: inherit;
+  text-decoration: none;
+  font-weight: 700;
+}
+.shared-header small {
+  font-size: 11px;
+  margin-left: 10px;
+}
+.shared-layout {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  min-height: calc(100dvh - 70px);
+}
+.shared-controls {
+  padding: 28px;
+  max-height: calc(100dvh - 70px);
+  overflow: auto;
+}
+.shared-heading h1 {
+  font-size: 32px;
+  line-height: 1.35;
+  margin: 14px 0;
+}
+.shared-heading p,
+.shared-controls p {
+  font-size: 13px;
+  line-height: 1.7;
+}
+.room-status {
+  color: #226555;
+  font-weight: bold;
+}
+.shared-error {
+  padding: 12px;
+  background: #fff0d5;
+  border-left: 3px solid #9b6127;
+}
+.shared-controls button {
+  min-height: 42px;
+  padding: 8px 12px;
+  border: 1px solid #b8cabd;
+  border-radius: 6px;
+  background: #e5ebde;
+  color: #173f42;
+  cursor: pointer;
+}
+.shared-controls button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.shared-controls .primary {
+  width: 100%;
+  background: #174e4d;
+  color: white;
+  border-color: #174e4d;
+}
+.shared-flight {
+  padding: 14px 0;
+  border-top: 1px solid #cbd6c8;
+}
+.shared-flight strong {
+  font-size: 14px;
+}
+.shared-flight > button + button {
+  width: 100%;
+  margin-top: 8px;
+}
+.shared-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 12px 0;
+}
+.shared-volume {
+  display: grid;
+  gap: 10px;
+  font-size: 13px;
+  padding: 12px 0;
+}
+.shared-editor {
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  margin: 18px 0;
+}
+.shared-editor legend {
+  font-weight: bold;
+  padding: 0 0 12px;
+}
+.shared-editor label {
+  display: grid;
+  gap: 7px;
+  font-size: 13px;
+  margin: 0 0 12px;
+}
+.shared-editor select {
+  width: 100%;
+  padding: 10px;
+  background: white;
+  border: 1px solid #becdc1;
+  border-radius: 5px;
+  color: inherit;
+}
+.shared-step {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 10px 0;
+  gap: 8px;
+}
+.shared-step span {
+  display: flex;
+  gap: 8px;
+  font-size: 13px;
+}
+.shared-step button {
+  min-width: 46px;
+}
+.shared-editor:disabled .anchor-map {
+  pointer-events: none;
+  opacity: 0.5;
+}
+.shared-import {
+  font-size: 12px;
+  display: grid;
+  gap: 8px;
+  margin: 14px 0;
+}
+.shared-import input {
+  max-width: 100%;
+}
+.room-invite {
+  margin-top: 18px;
+  border-top: 1px solid #cbd6c8;
+  padding: 14px 0;
+}
+.room-invite summary {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+.room-invite img {
+  display: block;
+  width: 100%;
+  margin: 14px 0;
+}
+.room-invite input {
+  width: 100%;
+  font-size: 11px;
+  padding: 8px;
+  margin-bottom: 8px;
+}
+.shared-controls .shared-footnote {
+  font-size: 11px;
+  color: #55726e;
+}
+.shared-controls .aircraft-info {
+  position: static;
+  width: 100%;
+  margin: 12px 0;
+  box-shadow: none;
+}
+.shared-view {
+  position: relative;
+  min-height: 540px;
+  height: calc(100dvh - 70px);
+  overflow: hidden;
+}
+.shared-view .world {
+  position: absolute;
+  inset: 0;
+}
+.shared-caption {
+  position: absolute;
+  bottom: 24px;
+  left: 24px;
+  right: 24px;
+  color: white;
+  pointer-events: none;
+  text-shadow: 0 1px 5px #243f49;
+  display: grid;
+  gap: 8px;
+}
+.shared-caption small {
+  font-size: 12px;
+}
+@media (max-width: 760px) {
+  .shared-header {
+    padding: 0 16px;
+    font-size: 13px;
+  }
+  .shared-layout {
+    grid-template-columns: 1fr;
+  }
+  .shared-view {
+    grid-row: 1;
+    min-height: 360px;
+    height: 48dvh;
+  }
+  .shared-controls {
+    max-height: none;
+    padding: 24px;
+  }
+  .shared-heading h1 {
+    font-size: 28px;
+  }
+  .shared-controls .primary {
+    min-height: 48px;
+  }
+}

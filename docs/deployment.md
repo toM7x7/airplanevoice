@@ -1,8 +1,58 @@
 # 公開先・クラウド構成・展示会の予備動作
 
-更新: 2026-09-15 / v0.5.2
+更新: 2026-09-16 / v0.8.0
 
-## 試遊版の公開先
+## 現在の公開先
+
+- [共同編集・飛行を試す](https://airplanevoice-shared-sky.tomohaya-falcon-aramaki.workers.dev/?shared=1)：Cloudflare Workers＋SQLite型Durable Objects。アプリとAPIは同一オリジン。
+- [従来の単体版](https://tom7x7.github.io/airplanevoice/)：GitHub Pages。設定URL／QR・単体オフライン体験を保持し、共同編集へリンクする。
+
+ユーザー指定のCloudflareアカウントへ配置。2026-09-16に管理画面のWorkers Free／Current planを確認。有料契約への変更、独自ドメイン、D1・R2・AI契約は行っていない。初回の上限・データ寿命は[共有設計](shared-sky.md)。Freeの枠は同じアカウントの他サービス使用量にも影響されるため、展示規模の可用性は別に検証する。
+
+### PC＋Quest 3で試す手順
+
+1. PCで共同編集のURLを開き「共有する部屋をつくる」。
+2. 「Quest・もう一台を招待」を開き、URLを渡すか、表示されたQRをQuestからXRQR等で読む。
+3. Questのブラウザで同じ部屋へ入ったら「VRで空に立つ」。必要なら操作盤の「音を聴く」を押す。
+4. PCとQuestのどちらからでも、機体・航路・高度・速度を変更する。VRの「2地点を動かす」ではA/Bを選び東西南北へ移動する。
+5. 「一緒に飛ばす」。飛行中の編集は次便用の下書き。「次の便を予約」で現在の便と音の余韻の後へ予約でき、発進前は取り消せる。
+6. 「自分の音を休む」やVR退出で相手の飛行は止まらない。同じ招待URLで1時間の期限内に入り直せる。残したい設定はJSONで保存する。
+
+再接続後は現在の便へ追いつく。通信断中に行った操作を後からまとめて上書きする方式にはしない。部屋期限が切れたら、この共同編集URLから新しい部屋を作る。展示会で終日使う固定QR・永続ルームはまだ別途設計が必要。
+
+### ローカル起動と配置
+
+```sh
+npm ci
+npm run check:worker
+npm run build
+npm run dev:shared
+# http://127.0.0.1:8787/?shared=1
+```
+
+別端末で`npm run dev`を起動すると、Viteの`/api`を8787へ転送して編集できる。WorkerのローカルDBは`.wrangler`に保存され、クラウドとは別。`npm run test:shared`で実際のWebSocketとブラウザ2台・Quest模擬を検証する。公開版へ向ける場合は`SHARED_URL`と`SHARED_OUTPUT`を指定する。
+
+```sh
+npx wrangler whoami
+npm run check:worker
+npm test
+npm run build
+npx wrangler deploy --dry-run
+npx wrangler deploy
+```
+
+`wrangler.jsonc`に指定アカウントを固定している。CLI認証と対象アカウントのFreeプランを確認してから配置する。アプリ内の接続先は同じオリジン。Pagesの共有入口を変更した場合も、CloudflareとGitHub Pagesの両方の成果物へ反映する。GitHub ActionsにCloudflareの資格情報は保存していないため、共有版の配置は手動CLI。
+
+### 実機で残る確認
+
+- PC→Quest、Quest→PCの編集・発進・次便の取消。
+- 本体スピーカーで1機の厚み・方向・遅れて聞こえる感覚。各端末の休憩・音量が相手を止めないこと。
+- 同じ機体を眺めたときの時刻・位置のずれ、通信断と復帰、Questのフレーム時間。
+- 招待QRの再読取、期限切れから新しい部屋への導線。
+
+AR・現実空間の位置合わせ・ブース案内は[2モードの設計](ar-modes.md)までで、公開機能には含めない。
+
+## これまでの単体版配布と設計の記録（v0.5.2時点）
 
 GitHub Pagesで静的Webアプリの試遊版を配信する。独自ドメインは取得しない。**本番の配信・共有・DB・AI基盤は未決定**で、[本番環境の相談](production-options.md)でCloudflare、Vercel等と比較する。
 

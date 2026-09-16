@@ -2,6 +2,9 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { App } from "./App";
 import "./style.css";
+const SharedApp = React.lazy(() =>
+  import("./SharedApp").then((module) => ({ default: module.SharedApp })),
+);
 
 class ErrorBoundary extends React.Component<
   React.PropsWithChildren,
@@ -25,6 +28,15 @@ class ErrorBoundary extends React.Component<
 }
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <ErrorBoundary>
-    <App />
+    {new URLSearchParams(location.search).has("shared") ||
+    new URLSearchParams(location.search).has("room") ? (
+      <React.Suspense
+        fallback={<main className="fatal">共有する空を開いています…</main>}
+      >
+        <SharedApp />
+      </React.Suspense>
+    ) : (
+      <App />
+    )}
   </ErrorBoundary>,
 );

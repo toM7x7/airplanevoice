@@ -387,7 +387,7 @@ export function App() {
       [
         JSON.stringify(
           {
-            version: "0.7.0",
+            version: "0.8.0",
             platform: vr.diagnostics.frames > 0 ? "webxr-standalone" : "web",
             route: e.spec,
             aircraftDesign: e.aircraftDesign,
@@ -580,6 +580,16 @@ export function App() {
           </span>
         </a>
         <div className="top-actions">
+          <a
+            className="quiet-button"
+            href={
+              location.hostname === "tom7x7.github.io"
+                ? "https://airplanevoice-shared-sky.tomohaya-falcon-aramaki.workers.dev/?shared=1"
+                : "?shared=1"
+            }
+          >
+            一緒に飛ばす
+          </a>
           <span className="edition">
             SKY WORKSHOP <span>03</span>
           </span>
@@ -1046,7 +1056,7 @@ export function App() {
         >
           音・表示の設定 <span>{diagnostics ? "−" : "+"}</span>
         </button>
-        <span className="version">WORKSHOP · v0.7.0</span>
+        <span className="version">WORKSHOP · v0.8.0</span>
       </footer>
       {transfer && (
         <SkyTransfer

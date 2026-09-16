@@ -9,6 +9,20 @@ import type { AircraftAudio } from "./audio";
 
 type VrStatus =
   "checking" | "unsupported" | "ready" | "entering" | "presenting";
+export interface SharedVrPanel {
+  title: string;
+  status: string;
+  detail: string;
+  buttons: {
+    label: string;
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    enabled?: boolean;
+    press: () => void;
+  }[];
+}
 type Action =
   | "primary"
   | "sound"
@@ -105,6 +119,8 @@ export class VrRuntime {
   onProfile = () => {};
   onSelect = (_id: FlightId) => {};
   onClear = () => {};
+  onLocalRest: (() => void) | null = null;
+  sharedPanel: SharedVrPanel | null = null;
 
   constructor(
     private experience: Experience,
@@ -228,6 +244,11 @@ export class VrRuntime {
     }
   }
   private pause() {
+    if (this.onLocalRest) {
+      this.onLocalRest();
+      this.audio.stop();
+      return;
+    }
     if (this.experience.phase !== "EDIT" && !this.experience.paused)
       this.experience.togglePause();
     this.audio.stop();
@@ -362,6 +383,14 @@ export class VrRuntime {
       if (hit?.uv) {
         const x = hit.uv.x * 1024,
           y = (1 - hit.uv.y) * 512;
+        if (this.sharedPanel) {
+          const shared = this.sharedPanel.buttons.find(
+            (b) => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h,
+          );
+          if (shared && shared.enabled !== false) shared.press();
+          this.panelAt = 0;
+          return;
+        }
         const button = (this.audioPage ? AUDIO_BUTTONS : BUTTONS).find(
           (b) => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h,
         );
@@ -485,6 +514,33 @@ export class VrRuntime {
     this.panelAt = performance.now();
     const ctx = this.ctx,
       e = this.experience;
+    if (this.sharedPanel) {
+      const panel = this.sharedPanel;
+      ctx.fillStyle = "#132e31";
+      ctx.fillRect(0, 0, 1024, 512);
+      ctx.fillStyle = "#eaf4db";
+      ctx.font = "bold 32px sans-serif";
+      ctx.fillText(panel.title, 30, 47);
+      ctx.font = "24px sans-serif";
+      ctx.fillText(panel.status, 30, 90);
+      ctx.fillText(panel.detail, 30, 126);
+      for (const b of panel.buttons) {
+        ctx.fillStyle = b.enabled === false ? "#1c373a" : "#36585b";
+        ctx.fillRect(b.x, b.y, b.w, b.h);
+        ctx.fillStyle = b.enabled === false ? "#8aa39d" : "#f4f6ea";
+        ctx.font = "bold 25px sans-serif";
+        ctx.fillText(b.label, b.x + 16, b.y + b.h / 2 + 9, b.w - 30);
+      }
+      ctx.fillStyle = "#b9d6d0";
+      ctx.font = "18px sans-serif";
+      ctx.fillText(
+        "グリップ：操作盤を呼ぶ / 次の設定はPCにも反映されます",
+        30,
+        505,
+      );
+      this.panel.material.map!.needsUpdate = true;
+      return;
+    }
     ctx.fillStyle = "#132e31";
     ctx.fillRect(0, 0, 1024, 512);
     ctx.fillStyle = "#eaf4db";
@@ -641,6 +697,7 @@ export class VrRuntime {
       selectionMarkerVisible: this.marker?.visible ?? false,
       soundOn: this.soundOn,
       audioPage: this.audioPage,
+      sharedPage: this.sharedPanel?.title ?? null,
     };
   }
 }
