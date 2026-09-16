@@ -10,6 +10,7 @@ Original prompt: 空repo https://github.com/toM7x7/airplanevoice — 資料を�
 - 既存共有10項目、展示入口8項目も合格。QR復号、権限、編集、再入場、同一便のAR往復、AR拒否時のVRを確認。サーバーのalarm実装は変更しておらず、今回は実時間alarm試験を繰り返していない。
 - Workerの型確認、公開dry-run、WEB_GAME_CLIENTの画面・状態確認も完了。PC・模擬XR・狭い画面の画像を確認。モジュールのtypeに関する共有スキル側のNode警告と従来のJSチャンクサイズ警告は継続。出力はoutput/tower、shared、exhibition-v091、game-client-v091。
 - Cloudflareの既存Workerへ配置済み。版ID `c095e3e8-f839-421e-9c9c-76da4e3f4d58`。追加の課金API・binding・契約変更なし。新機能の実際の声とQuest聴感は人による確認待ち。
+- Cloudflare公開版でも新規管制6項目が合格（output/tower-public-v091）。実装コミット `0b3b769` のCI（35062601475）は成功。公開検証の音声もモックであり、外部AI推論・音声APIは呼び出していない。
 
 ## 2026-09-16 v0.9.0 展示入口・観覧権限・基本AR
 
