@@ -39,10 +39,12 @@ export function SharedApp() {
   const [resting, setResting] = useState(true);
   const [volume, setVolume] = useState(35);
   const [qr, setQr] = useState("");
+  const [inviteUrl, setInviteUrl] = useState("");
+  const [visitorQr, setVisitorQr] = useState(true);
   const [note, setNote] = useState("");
-  const [page, setPage] = useState<"main" | "edit" | "points" | "audio">(
-    "main",
-  );
+  const [page, setPage] = useState<
+    "main" | "edit" | "points" | "audio" | "view"
+  >("main");
   const [point, setPoint] = useState<"a" | "b">("a");
   const [, repaint] = useState(0);
   const recipe = room.state?.draft ?? DEFAULT_WORKSHOP;
@@ -52,7 +54,13 @@ export function SharedApp() {
   const active = room.state?.flights.find(
     (f) => f.startsAt <= now && f.clearAt > now,
   );
-  const enabled = client.ready && !!room.state;
+  const visitor =
+    room.role === "viewer" ||
+    (room.role === "unknown" &&
+      new URLSearchParams(location.search).get("visit") === "1");
+  const exhibition = !!room.state?.exhibition;
+  const repeating = !!room.state?.exhibition?.repeat;
+  const enabled = client.ready && !!room.state && room.role === "editor";
   const status =
     room.status === "connected"
       ? `${room.peers}台で共有中`
@@ -64,8 +72,10 @@ export function SharedApp() {
   const flightLabel = next
     ? `次の便まで ${Math.max(0, Math.ceil((next.startsAt - now) / 1000))}秒`
     : active
-      ? "同じ旅客機が飛行中。次の設定を作れます。"
-      : "準備できたら、一緒に飛ばそう。";
+      ? "同じ旅客機が飛行中です。"
+      : visitor
+        ? "運営が飛行を準備しています。"
+        : "準備できたら、一緒に飛ばそう。";
   const update = (r: WorkshopRecipe) => {
     if (!enabled) return;
     try {
@@ -151,10 +161,44 @@ export function SharedApp() {
       h: 69,
     });
   };
-  if (page === "main") {
+  if (page === "view") {
     add(
-      next ? "次の便を取り消す" : active ? "次の便を予約" : "一緒に飛ばす",
-      () => (next ? client.send({ type: "cancel-next" }) : launch()),
+      vrState.displayMode === "ar" ? "仮想の空に戻る" : "現実に機体を重ねる",
+      () => vr.toggleEnvironment(),
+      vr.canShowAR,
+    );
+    add("操作盤を閉じて眺める", () => vr.hidePanel());
+    add("音の設定", () => setPage("audio"));
+    add("選択を外す", clear);
+    add("再接続", client.reconnect, room.status !== "connected");
+    add("空の操作へ", () => setPage("main"));
+    add("ブラウザに戻る", () => void vr.exit());
+  } else if (page === "main" && visitor) {
+    add("操作盤を閉じて眺める", () => vr.hidePanel());
+    add(resting ? "音を聴く" : "自分の音を休む", () =>
+      resting ? void listen() : rest(),
+    );
+    add("音の設定", () => setPage("audio"));
+    add("選択を外す", clear);
+    add("見え方・操作案内", () => setPage("view"));
+    add("ブラウザに戻る", () => void vr.exit());
+  } else if (page === "main") {
+    add(
+      exhibition
+        ? repeating
+          ? "繰り返しを止める"
+          : "展示の飛行を始める"
+        : next
+          ? "次の便を取り消す"
+          : active
+            ? "次の便を予約"
+            : "一緒に飛ばす",
+      () =>
+        exhibition
+          ? client.send({ type: "repeat", enabled: !repeating })
+          : next
+            ? client.send({ type: "cancel-next" })
+            : launch(),
       enabled,
     );
     add(resting ? "音を聴く" : "自分の音を休む", () =>
@@ -164,8 +208,8 @@ export function SharedApp() {
     add("2地点を動かす", () => setPage("points"), !!room.state);
     add("音の設定", () => setPage("audio"));
     add("選択を外す", clear);
-    add("再接続", client.reconnect, room.status !== "connected");
-    add("VRを終了", () => void vr.exit());
+    add("見え方・操作案内", () => setPage("view"));
+    add("ブラウザに戻る", () => void vr.exit());
   } else if (page === "edit") {
     add(
       `機体：${recipe.aircraft.engineCount}発 → 別の機体`,
@@ -226,21 +270,28 @@ export function SharedApp() {
   }
   vr.sharedPanel = {
     title:
-      page === "main"
-        ? "AIRPLANEVOICE / 共有する空"
-        : page === "edit"
-          ? "次の機体・航路をつくる"
-          : page === "points"
-            ? "次の航路 / 2地点を動かす"
-            : "自分の音の設定",
+      page === "view"
+        ? "見え方・操作案内（自分だけ）"
+        : page === "main"
+          ? "AIRPLANEVOICE / 共有する空"
+          : page === "edit"
+            ? "次の機体・航路をつくる"
+            : page === "points"
+              ? "次の航路 / 2地点を動かす"
+              : "自分の音の設定",
     status: room.error || note || `${status} / ${flightLabel}`,
     detail:
-      inspection?.visible && page === "main"
-        ? `${inspection.id} / ${Math.round(inspection.speedMps! * 3.6)} km/h / ${inspection.headingLabel} ${Math.round(inspection.headingDeg!)}°`
-        : page === "points"
-          ? `${point.toUpperCase()}：東西 ${recipe.route[point].x} m / 南北 ${recipe.route[point].z} m`
-          : `${recipe.aircraft.engineCount}発 / 高度 ${recipe.route.altitudeM} m / 速度 ${recipe.flight.speedMps} m/s / 音量 ${volume}%`,
+      page === "view"
+        ? vr.canShowAR
+          ? "移動せず眺めよう。切り替えても同じ便が続きます。"
+          : "この入場ではARに切り替えられません。"
+        : inspection?.visible && page === "main"
+          ? `${inspection.id} / ${Math.round(inspection.speedMps! * 3.6)} km/h / ${inspection.headingLabel} ${Math.round(inspection.headingDeg!)}°`
+          : page === "points"
+            ? `${point.toUpperCase()}：東西 ${recipe.route[point].x} m / 南北 ${recipe.route[point].z} m`
+            : `${recipe.aircraft.engineCount}発 / 高度 ${recipe.route.altitudeM} m / 速度 ${recipe.flight.speedMps} m/s / 音量 ${volume}%`,
     buttons,
+    hint: "人差し指のトリガー：決定 ／ 側面のグリップ：操作盤を呼ぶ",
   };
   const tick = () => {
     const state = client.snapshot.state;
@@ -287,16 +338,24 @@ export function SharedApp() {
     };
   }, [client, audio]);
   useEffect(() => {
-    if (!room.state || !client.id) return;
+    if (!room.state || !client.id || room.role !== "editor") return;
     let live = true;
-    void import("qrcode")
-      .then((QR) =>
-        QR.toDataURL(client.invite, {
+    setQr("");
+    setInviteUrl("");
+    void Promise.all([
+      import("qrcode"),
+      exhibition && visitorQr
+        ? client.visitorInvite()
+        : Promise.resolve(client.invite),
+    ])
+      .then(([QR, url]) => {
+        if (live) setInviteUrl(url);
+        return QR.toDataURL(url, {
           width: 440,
           margin: 3,
           errorCorrectionLevel: "M",
-        }),
-      )
+        });
+      })
       .then((image) => {
         if (live) setQr(image);
       })
@@ -306,7 +365,7 @@ export function SharedApp() {
     return () => {
       live = false;
     };
-  }, [client, !!room.state]);
+  }, [client, !!room.state, room.role, exhibition, visitorQr]);
   useEffect(() => {
     e.onArrival = (arrival, now) => {
       if (!resting && !document.hidden && vr.canAdvance)
@@ -357,23 +416,29 @@ export function SharedApp() {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
   return (
-    <main className="shared-app">
+    <main className={`shared-app${visitor ? " visitor-app" : ""}`}>
       <header className="shared-header">
         <a href="./">音航跡 / AIRPLANEVOICE</a>
         <span>
-          共有する空 <small>v0.8.1</small>
+          共有する空 <small>v0.9.0</small>
         </span>
       </header>
       <div className="shared-layout">
         <aside className="shared-controls" aria-label="共有する空の設定">
           <div className="shared-heading">
-            <span className="eyebrow">MAKE A SKY TOGETHER</span>
+            <span className="eyebrow">
+              {visitor ? "旅客機を見上げる" : "MAKE A SKY TOGETHER"}
+            </span>
             <h1>
-              同じ空で、
+              {visitor ? "空を見上げて、" : "同じ空で、"}
               <br />
-              つくって飛ばそう。
+              {visitor ? "旅客機の声を聴く。" : "つくって飛ばそう。"}
             </h1>
-            <p>PCでも、Questでも。次の飛び方を一緒に。</p>
+            <p>
+              {visitor
+                ? "音のする方へ、ゆっくり顔を向けてみよう。"
+                : "PCでも、Questでも。次の飛び方を一緒に。"}
+            </p>
           </div>
           <p className="room-status" role="status">
             {status}
@@ -386,46 +451,84 @@ export function SharedApp() {
           )}
           {!room.state ? (
             <>
-              <button
-                className="primary"
-                disabled={room.status === "connecting"}
-                onClick={() => void client.create()}
-              >
-                共有する部屋をつくる
-              </button>
-              <p>部屋は1時間。招待した人は同じ設定を編集できます。</p>
+              {!visitor && (
+                <>
+                  <button
+                    className="primary"
+                    disabled={room.status === "connecting"}
+                    onClick={() => void client.create()}
+                  >
+                    共有する部屋をつくる
+                  </button>
+                  <p>部屋は1時間。招待した人は同じ設定を編集できます。</p>
+                  <button
+                    disabled={room.status === "connecting"}
+                    onClick={() => void client.create(true)}
+                  >
+                    展示用の部屋をつくる（8時間）
+                  </button>
+                  <p>
+                    運営が飛行を準備し、来場者は観覧用QRから入ります。同時に4台まで。
+                  </p>
+                </>
+              )}
               {client.id && (
                 <button onClick={client.reconnect}>招待した部屋へ再接続</button>
               )}
             </>
           ) : (
             <>
-              <div className="shared-flight">
-                <strong>{flightLabel}</strong>
-                <p>編集中の設定は、次に飛ばす便へ反映します。</p>
-                <button
-                  id="shared-launch"
-                  className="primary"
-                  disabled={!enabled || !!next}
-                  onClick={launch}
-                >
-                  {active ? "次の便を予約" : "一緒に飛ばす"}
-                </button>
-                {next && (
+              {!visitor && (
+                <div className="shared-flight">
+                  <strong>{flightLabel}</strong>
+                  <p>編集中の設定は、次に飛ばす便へ反映します。</p>
                   <button
-                    disabled={!enabled}
-                    onClick={() => client.send({ type: "cancel-next" })}
+                    id="shared-launch"
+                    className="primary"
+                    disabled={!enabled || !!next || repeating}
+                    onClick={launch}
                   >
-                    次の便を取り消す
+                    {active ? "次の便を予約" : "一緒に飛ばす"}
                   </button>
-                )}
-              </div>
+                  {next && !repeating && (
+                    <button
+                      disabled={!enabled}
+                      onClick={() => client.send({ type: "cancel-next" })}
+                    >
+                      次の便を取り消す
+                    </button>
+                  )}
+                  {exhibition && (
+                    <>
+                      <button
+                        id="exhibition-repeat"
+                        disabled={!enabled}
+                        onClick={() =>
+                          client.send({ type: "repeat", enabled: !repeating })
+                        }
+                      >
+                        {repeating ? "繰り返しを止める" : "展示の飛行を始める"}
+                      </button>
+                      <p>
+                        {repeating
+                          ? "繰り返し飛行中。止めると現在の便まで飛びます。"
+                          : "開始すると、誰も操作しなくても同じ設定で飛び続けます。"}
+                      </p>
+                    </>
+                  )}
+                </div>
+              )}
               <div className="shared-actions">
                 <button onClick={() => (resting ? void listen() : rest())}>
-                  {resting ? "音を聴く" : "自分の音を休む"}
+                  {resting
+                    ? visitor
+                      ? "この画面で体験する"
+                      : "音を聴く"
+                    : "自分の音を休む"}
                 </button>
                 <button
                   id="vr-enter"
+                  className={visitor ? "primary" : undefined}
                   disabled={
                     vrState.status !== "ready" &&
                     vrState.status !== "presenting"
@@ -433,15 +536,41 @@ export function SharedApp() {
                   onClick={() => {
                     if (vr.active) void vr.exit();
                     else {
-                      void vr.enter();
+                      void vr.enter(true);
                       void listen();
                     }
                   }}
                 >
-                  {vr.active ? "VRを終了" : "VRで空に立つ"}
+                  {vr.active
+                    ? "ブラウザに戻る"
+                    : visitor
+                      ? "Questで体験をはじめる"
+                      : "VRで空に立つ"}
                 </button>
               </div>
               {vrState.error && <p role="alert">{vrState.error}</p>}
+              {vrState.error && vrState.arSupported && (
+                <button
+                  onClick={() => {
+                    void vr.enter(false);
+                    void listen();
+                  }}
+                >
+                  ARを使わずVRで開く
+                </button>
+              )}
+              <details className="room-guide">
+                <summary>Questでの操作案内</summary>
+                <p>
+                  コントローラーで指して、人差し指のトリガーを押すと決定します。側面のグリップで操作盤を目の前に呼べます。
+                </p>
+                <p>
+                  機体を指すと情報を表示。何もない場所を選ぶと解除します。音量や見え方は自分だけに反映します。
+                </p>
+                <p>
+                  操作盤の「見え方・操作案内」から、対応端末では現実の景色に機体を重ねられます。まずは移動せず、周りに気を配って眺めてください。
+                </p>
+              </details>
               <label className="shared-volume">
                 自分の音量 {volume}%
                 <input
@@ -473,146 +602,192 @@ export function SharedApp() {
                   onLook={look}
                 />
               )}
-              <fieldset disabled={!enabled} className="shared-editor">
-                <legend>次に飛ばす設定</legend>
-                <label>
-                  機体
-                  <select
-                    aria-label="共有する機体"
-                    value={AIRCRAFT_PATTERNS.findIndex(
-                      (p) =>
-                        p.aircraft.bodyLengthM === recipe.aircraft.bodyLengthM,
+              {!visitor && (
+                <>
+                  <fieldset disabled={!enabled} className="shared-editor">
+                    <legend>次に飛ばす設定</legend>
+                    <label>
+                      機体
+                      <select
+                        aria-label="共有する機体"
+                        value={AIRCRAFT_PATTERNS.findIndex(
+                          (p) =>
+                            p.aircraft.bodyLengthM ===
+                            recipe.aircraft.bodyLengthM,
+                        )}
+                        onChange={(ev) =>
+                          update({
+                            ...recipe,
+                            aircraft:
+                              AIRCRAFT_PATTERNS[+ev.target.value].aircraft,
+                          })
+                        }
+                      >
+                        {AIRCRAFT_PATTERNS.map((p, i) => (
+                          <option key={p.name} value={i}>
+                            {p.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      航路の出発点
+                      <select
+                        aria-label="共有する航路"
+                        value=""
+                        onChange={(ev) => {
+                          const p = ROUTE_PATTERNS[+ev.target.value];
+                          update({
+                            ...recipe,
+                            route: p.route,
+                            flight: p.flight,
+                          });
+                        }}
+                      >
+                        <option value="" disabled>
+                          パターンから変更
+                        </option>
+                        {ROUTE_PATTERNS.map((p, i) => (
+                          <option key={p.name} value={i}>
+                            {p.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <div className="shared-step">
+                      <button
+                        aria-label="共有高度を下げる"
+                        onClick={() => adjust("altitude", -20)}
+                      >
+                        −
+                      </button>
+                      <span>
+                        高度 <b>{recipe.route.altitudeM} m</b>
+                      </span>
+                      <button
+                        aria-label="共有高度を上げる"
+                        onClick={() => adjust("altitude", 20)}
+                      >
+                        ＋
+                      </button>
+                    </div>
+                    <div className="shared-step">
+                      <button
+                        aria-label="共有速度を下げる"
+                        onClick={() => adjust("speed", -5)}
+                      >
+                        −
+                      </button>
+                      <span>
+                        速度 <b>{recipe.flight.speedMps} m/s</b>
+                      </span>
+                      <button
+                        aria-label="共有速度を上げる"
+                        onClick={() => adjust("speed", 5)}
+                      >
+                        ＋
+                      </button>
+                    </div>
+                    <AnchorMap
+                      generator={recipe.route}
+                      route={compiled.samples.map((s) => s.position)}
+                      onChange={(route) => update({ ...recipe, route })}
+                    />
+                  </fieldset>
+                  <button onClick={download}>次の設定をJSONで保存</button>
+                  <label className="shared-import">
+                    保存した設定を読み込む
+                    <input
+                      type="file"
+                      accept="application/json,.json"
+                      disabled={!enabled}
+                      onChange={async (ev) => {
+                        const file = ev.target.files?.[0];
+                        if (!file) return;
+                        if (file.size > 12000) {
+                          setNote("設定は12,000バイト以内にしてください。");
+                          return;
+                        }
+                        try {
+                          const r = checkedWorkshop(
+                            JSON.parse(await file.text()),
+                          );
+                          update(r.recipe);
+                        } catch {
+                          setNote(
+                            "この設定を読み込めませんでした。前の設定を保ちます。",
+                          );
+                        }
+                        ev.target.value = "";
+                      }}
+                    />
+                  </label>
+                  <details className="room-invite">
+                    <summary>
+                      {exhibition
+                        ? "展示のQR・編集者の招待"
+                        : "Quest・もう一台を招待"}
+                    </summary>
+                    {exhibition && (
+                      <label>
+                        招待する人
+                        <select
+                          aria-label="招待する人"
+                          value={visitorQr ? "visitor" : "editor"}
+                          onChange={(event) =>
+                            setVisitorQr(event.target.value === "visitor")
+                          }
+                        >
+                          <option value="visitor">来場者（観覧のみ）</option>
+                          <option value="editor">
+                            運営（飛行を編集できる）
+                          </option>
+                        </select>
+                      </label>
                     )}
-                    onChange={(ev) =>
-                      update({
-                        ...recipe,
-                        aircraft: AIRCRAFT_PATTERNS[+ev.target.value].aircraft,
-                      })
-                    }
-                  >
-                    {AIRCRAFT_PATTERNS.map((p, i) => (
-                      <option key={p.name} value={i}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  航路の出発点
-                  <select
-                    aria-label="共有する航路"
-                    value=""
-                    onChange={(ev) => {
-                      const p = ROUTE_PATTERNS[+ev.target.value];
-                      update({ ...recipe, route: p.route, flight: p.flight });
-                    }}
-                  >
-                    <option value="" disabled>
-                      パターンから変更
-                    </option>
-                    {ROUTE_PATTERNS.map((p, i) => (
-                      <option key={p.name} value={i}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <div className="shared-step">
-                  <button
-                    aria-label="共有高度を下げる"
-                    onClick={() => adjust("altitude", -20)}
-                  >
-                    −
-                  </button>
-                  <span>
-                    高度 <b>{recipe.route.altitudeM} m</b>
-                  </span>
-                  <button
-                    aria-label="共有高度を上げる"
-                    onClick={() => adjust("altitude", 20)}
-                  >
-                    ＋
-                  </button>
-                </div>
-                <div className="shared-step">
-                  <button
-                    aria-label="共有速度を下げる"
-                    onClick={() => adjust("speed", -5)}
-                  >
-                    −
-                  </button>
-                  <span>
-                    速度 <b>{recipe.flight.speedMps} m/s</b>
-                  </span>
-                  <button
-                    aria-label="共有速度を上げる"
-                    onClick={() => adjust("speed", 5)}
-                  >
-                    ＋
-                  </button>
-                </div>
-                <AnchorMap
-                  generator={recipe.route}
-                  route={compiled.samples.map((s) => s.position)}
-                  onChange={(route) => update({ ...recipe, route })}
-                />
-              </fieldset>
-              <button onClick={download}>次の設定をJSONで保存</button>
-              <label className="shared-import">
-                保存した設定を読み込む
-                <input
-                  type="file"
-                  accept="application/json,.json"
-                  disabled={!enabled}
-                  onChange={async (ev) => {
-                    const file = ev.target.files?.[0];
-                    if (!file) return;
-                    if (file.size > 12000) {
-                      setNote("設定は12,000バイト以内にしてください。");
-                      return;
-                    }
-                    try {
-                      const r = checkedWorkshop(JSON.parse(await file.text()));
-                      update(r.recipe);
-                    } catch {
-                      setNote(
-                        "この設定を読み込めませんでした。前の設定を保ちます。",
-                      );
-                    }
-                    ev.target.value = "";
-                  }}
-                />
-              </label>
-              <details className="room-invite">
-                <summary>Quest・もう一台を招待</summary>
-                {qr && <img src={qr} alt="共有する部屋の招待QR" />}
-                <input
-                  aria-label="部屋の招待URL"
-                  readOnly
-                  value={client.invite}
-                />
-                <button
-                  onClick={() => {
-                    void navigator.clipboard
-                      .writeText(client.invite)
-                      .then(() => setNote("招待URLをコピーしました。"))
-                      .catch(() =>
-                        setNote("URL欄を選択してコピーしてください。"),
-                      );
-                  }}
-                >
-                  招待URLをコピー
-                </button>
-                <p>
-                  同じURLで入り直せます。部屋の期限は{" "}
-                  {new Date(room.state.expiresAt).toLocaleTimeString("ja-JP")}
-                  。QRの読み取りには{" "}
-                  <a href="https://xrqr.net/" target="_blank" rel="noreferrer">
-                    XRQR
-                  </a>{" "}
-                  も使えます。
-                </p>
-              </details>
+                    {exhibition && (
+                      <p>
+                        {visitorQr
+                          ? "来場者用QR。展示時間中は何度でも入り直せます。"
+                          : "運営用です。来場者には観覧用QRを渡してください。"}
+                      </p>
+                    )}
+                    {qr && <img src={qr} alt="共有する部屋の招待QR" />}
+                    <input
+                      aria-label="部屋の招待URL"
+                      readOnly
+                      value={inviteUrl}
+                    />
+                    <button
+                      onClick={() => {
+                        void navigator.clipboard
+                          .writeText(inviteUrl)
+                          .then(() => setNote("招待URLをコピーしました。"))
+                          .catch(() =>
+                            setNote("URL欄を選択してコピーしてください。"),
+                          );
+                      }}
+                    >
+                      招待URLをコピー
+                    </button>
+                    <p>
+                      同じURLで入り直せます。部屋の期限は{" "}
+                      {new Date(room.state.expiresAt).toLocaleTimeString(
+                        "ja-JP",
+                      )}
+                      。QRの読み取りには{" "}
+                      <a
+                        href="https://xrqr.net/"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        XRQR
+                      </a>{" "}
+                      も使えます。
+                    </p>
+                  </details>
+                </>
+              )}
               {room.status !== "connected" && (
                 <button onClick={client.reconnect}>再接続</button>
               )}
@@ -622,9 +797,14 @@ export function SharedApp() {
                 </p>
               )}
               <p className="shared-footnote">
-                初回試作：同時飛行1機。自分の休憩やVR退出でも相手の空は動き続けます。
-                <br />
-                設定の版 {room.state.revision} / 往復通信 {room.rtt ?? "—"} ms
+                同時飛行1機。自分の休憩や退出でも、みんなの空は動き続けます。
+                {!visitor && (
+                  <>
+                    <br />
+                    設定の版 {room.state.revision} / 往復通信 {room.rtt ?? "—"}{" "}
+                    ms
+                  </>
+                )}
               </p>
             </>
           )}

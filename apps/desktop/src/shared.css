@@ -153,6 +153,26 @@
   font-size: 14px;
   font-weight: 600;
 }
+.room-guide {
+  margin: 16px 0;
+  font-size: 14px;
+}
+.room-guide summary {
+  cursor: pointer;
+}
+.room-invite select {
+  width: 100%;
+  padding: 10px;
+  margin-top: 8px;
+}
+.visitor-app .shared-actions {
+  grid-template-columns: 1fr;
+}
+.visitor-app #vr-enter {
+  order: -1;
+  min-height: 54px;
+  font-size: 16px;
+}
 .room-invite img {
   display: block;
   width: 100%;

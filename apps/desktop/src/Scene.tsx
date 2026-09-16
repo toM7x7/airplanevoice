@@ -1,5 +1,11 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useMemo, useRef, type MutableRefObject } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useSyncExternalStore,
+  type MutableRefObject,
+} from "react";
 import * as THREE from "three";
 import {
   AIRCRAFT,
@@ -108,6 +114,8 @@ function World({
   const trail = useRef<THREE.LineSegments>(null);
   const rings = useRef<THREE.InstancedMesh>(null);
   const { camera, gl, size, scene } = useThree();
+  const xr = useSyncExternalStore(vr.subscribe, () => vr.snapshot);
+  const passthrough = xr.displayMode === "ar";
   useEffect(() => vr.attach(gl, camera, scene), [vr, gl, camera, scene]);
   const geometry = useMemo(() => new THREE.BufferGeometry(), []);
   const trailVisibility = useMemo(() => new TrailVisibility(), []);
@@ -367,9 +375,11 @@ function World({
   });
   return (
     <>
-      <SkyEnvironment />
-      <fog attach="fog" args={["#bfd2df", 3000, 18000]} />
-      <Landscape />
+      <SkyEnvironment visible={!passthrough} />
+      {!passthrough && <fog attach="fog" args={["#bfd2df", 3000, 18000]} />}
+      <group visible={!passthrough}>
+        <Landscape />
+      </group>
       {AIRCRAFT.map((a, index) => (
         <group
           key={a.id}
@@ -380,15 +390,17 @@ function World({
           <Aircraft accent={a.accent} design={e.designFor(a.id)} />
         </group>
       ))}
-      <primitive object={lineObject} ref={design} />
-      <primitive object={trailObject} ref={trail} />
-      <instancedMesh
-        ref={rings}
-        args={[undefined, undefined, 8]}
-        frustumCulled={false}
-        material={ringMaterial}
-        geometry={ringGeometry}
-      />
+      <group visible={!passthrough}>
+        <primitive object={lineObject} ref={design} />
+        <primitive object={trailObject} ref={trail} />
+        <instancedMesh
+          ref={rings}
+          args={[undefined, undefined, 8]}
+          frustumCulled={false}
+          material={ringMaterial}
+          geometry={ringGeometry}
+        />
+      </group>
     </>
   );
 }
@@ -498,7 +510,11 @@ export function Scene(props: SceneProps) {
       <Canvas
         dpr={[1, 1.6]}
         camera={{ fov: 58, near: 0.1, far: 24000 }}
-        gl={{ antialias: true, powerPreference: "high-performance" }}
+        gl={{
+          antialias: true,
+          alpha: true,
+          powerPreference: "high-performance",
+        }}
         fallback={
           <div className="webgl-fallback">
             3D表示を開始できません。WebGLが使えるブラウザで開いてください。

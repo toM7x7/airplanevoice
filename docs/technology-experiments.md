@@ -1,6 +1,6 @@
 # 3D表現と仕組みの実験候補
 
-調査日: 2026-09-15。人気順位ではなく、この体験に使えそうな公式機能を整理する。
+初回調査: 2026-09-15 / XRのHTML UI候補を2026-09-16に追記。人気順位ではなく、この体験に使えそうな公式機能を整理する。
 
 ## 今の技術を簡単に言うと
 
@@ -34,6 +34,42 @@
 Three.jsのWebGPURendererはWebGPUを利用し、対応がないときはWebGL 2へ切り替える仕組みを持つ。TSLはJavaScriptの式からシェーダーを組み立てるための仕組み。現行アプリはWebGLRendererで動いており、移行はまだ行っていない。公式: [WebGPURenderer](https://threejs.org/docs/pages/WebGPURenderer.html)、[TSL仕様](https://github.com/mrdoob/three.js/wiki/Three.js-Shading-Language)。
 
 WebGPUの存在だけでQuest上の品質・速度や既存の描画との互換性は判断しない。現行の空のシェーダー、音航跡、XRの表示を同条件で試す。気流の表現を追加する場合も、「見せる演出」と「流体を計算した結果」は分ける。
+
+## 2026-09-16: HTMLで作るXRの操作盤
+
+ユーザー提供: [BANGEO「WebXRでHTML UIを扱う未来」](https://www.bangeo.net/tech-articles/webxr-html-ui-dom-overlay-html-in-canvas-spatial-css)（記事日付2026-06-11）。記事本文とリンク先の一次資料を確認した。以下は採用候補の調査で、実装・Quest実機検証は行っていない。
+
+### 現行との接点
+
+`apps/desktop/src/vr.ts`では1024×512のCanvasへ文字とボタンを描き、`CanvasTexture`を空間内の板へ貼っている。コントローラーのレイと板の交点からボタンを判定する。日本語の複数行説明、長い部屋一覧、地図とブース詳細、将来のAIの案内文を増やすと、手動の描画・配置処理も増える。
+
+記事を踏まえた設計案は、操作の意味と共有処理を共通にし、PCのHTML表示とXRの表示方法を選べるようにすること。HTML UI導入自体で、部屋の移動・AR切り替え・AI接続まで実装されるわけではない。
+
+| 方法 | Airplanevoiceでの候補 | 現時点の判断 |
+| --- | --- | --- |
+| 現行の3D操作盤 | すぐ見る・音量・飛行開始など少数の操作 | 既存方式で入口の単純化を進められる |
+| DOM Overlay | 対応端末のAR説明・短い設定・復旧案内 | 条件付き候補。仕様上は単一の2D DOM領域で、重ね合わせ位置はブラウザ側の方式に従う。任意の地図オブジェクト配置とは分ける |
+| HTML-in-Canvas | 空間に置く地図、部屋カード、機体情報、AIの短い案内 | 小さな比較試作の第一候補。ブラウザAPIとXR入力の成立を確認してから採用 |
+| Spatial CSS | 将来の空間対応ブラウザで見る入口・カタログ | 提案を追跡。現在のQuest向け飛行シーンの基盤変更には使わない |
+
+DOM Overlayは`optionalFeatures`で要求し、`session.domOverlayState`で有効化を確認する。表示できるときは`beforexrselect`でUI操作と機体選択の二重発火を抑える。DOM Overlayの一般的な仕様対応を、そのままQuest 3での動作確認とは扱わない。[W3C仕様](https://immersive-web.github.io/dom-overlays/)
+
+HTML-in-CanvasはDOMをCanvasやWebGL/WebGPUのテクスチャへ描く実験的API。Chrome公式の紹介では148〜150のOrigin Trialが記載されているが、この記事のバージョン範囲だけで現在のQuestブラウザへの一般提供を判断しない。WebXRの入力との統合は2026年5月の議事録でも検討対象。[Chrome公式](https://developer.chrome.com/blog/html-in-canvas-origin-trial) / [WICG提案](https://github.com/WICG/html-in-canvas) / [WebXRとの統合議論](https://www.w3.org/2026/05/19-immersive-web-minutes.html)
+
+導入済みThree.jsの`src/textures/HTMLTexture.js`と`renderers/webgl/WebGLTextures.js`に対応処理があることを確認。現行WebGLRendererにもブラウザの`texElementImage2D`を呼ぶ経路があり、この候補を試すためにWebGPU移行を必須にする必要はない。ただし、ライブラリ内にコードがあることと、Questの表示・入力が成立することは別。[Three.js HTMLTexture](https://threejs.org/docs/pages/HTMLTexture.html)
+
+Spatial CSSは文書自体へ奥行きを加える提案で、HTMLの説明やカードと3Dを同じ文書内に配置する方向。WebXRシーンの操作盤の直接的な置き換えとして採用しない。[WebKit提案](https://github.com/WebKit/explainers/blob/main/css-spatial/explainer.md)
+
+### 最初に試すなら
+
+**地図と3つの地点ボタンだけの小さなパネル**を、現行方式とHTML-in-Canvasで比較する案。最初は表示・選択までの検証とし、実ブースの測量、AI、公開ロビーの実装を一緒に完了した扱いにしない。
+
+- PCでの表示に加え、Questの両眼表示・日本語の読みやすさ・レイのホバー／クリック・必要ならスクロールを確かめる。
+- ブラウザAPI検出と実際の試験描画を行い、使えない環境では現行の操作盤で同じ操作を行える構成を検討する。来場者に実験フラグの変更を必須にしない。
+- 機体選択との二重入力、VR／AR入退場後の復帰、表示更新時のフレーム間隔を確認する。
+- フォーム入力やアクセシビリティは、HTMLを描画できたことだけで動作保証しない。必要な操作ごとに実機確認する。
+
+表示方式を増やしても、通常は空を眺め、必要なときだけ小さなパネルを開く体験を維持する。関連: [展示入口](room-lobby-flow.md) / [ARと地図](ar-modes.md)。
 
 ## 採用を決める小さな基準
 

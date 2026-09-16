@@ -10,6 +10,7 @@ import type { AircraftAudio } from "./audio";
 type VrStatus =
   "checking" | "unsupported" | "ready" | "entering" | "presenting";
 export interface SharedVrPanel {
+  hint?: string;
   title: string;
   status: string;
   detail: string;
@@ -69,7 +70,14 @@ const AUDIO_BUTTONS: typeof BUTTONS = [
 
 /** Single-user, stationary observation. Metres and the original audio clock stay shared. */
 export class VrRuntime {
-  snapshot = { status: "checking" as VrStatus, error: "" };
+  snapshot = {
+    status: "checking" as VrStatus,
+    error: "",
+    arSupported: false,
+    displayMode: "vr" as "vr" | "ar",
+  };
+  private sessionMode: XRSessionMode | null = null;
+  private floor: THREE.Mesh | null = null;
   private subscribers = new Set<() => void>();
   subscribe = (fn: () => void) => {
     this.subscribers.add(fn);
@@ -78,7 +86,7 @@ export class VrRuntime {
     };
   };
   private state(status: VrStatus, error = "") {
-    this.snapshot = { status, error };
+    this.snapshot = { ...this.snapshot, status, error };
     this.subscribers.forEach((fn) => fn());
   }
   private renderer: THREE.WebGLRenderer | null = null;
@@ -133,10 +141,15 @@ export class VrRuntime {
   async checkSupport() {
     if (this.active) return;
     try {
-      const supported =
-        window.isSecureContext &&
-        !!navigator.xr &&
-        (await navigator.xr.isSessionSupported("immersive-vr"));
+      if (!window.isSecureContext || !navigator.xr) {
+        this.state("unsupported");
+        return;
+      }
+      const [supported, arSupported] = await Promise.all([
+        navigator.xr.isSessionSupported("immersive-vr").catch(() => false),
+        navigator.xr.isSessionSupported("immersive-ar").catch(() => false),
+      ]);
+      this.snapshot = { ...this.snapshot, arSupported };
       this.state(supported ? "ready" : "unsupported");
     } catch {
       this.state("unsupported");
@@ -166,7 +179,7 @@ export class VrRuntime {
     void this.checkSupport();
   };
 
-  async enter() {
+  async enter(preferAR = false) {
     if (
       this.snapshot.status !== "ready" ||
       !this.renderer ||
@@ -177,13 +190,16 @@ export class VrRuntime {
     this.state("entering");
     try {
       // Must run directly in the button's user gesture, before awaiting audio or anything else.
-      const session = await navigator.xr.requestSession("immersive-vr", {
+      const mode =
+        preferAR && this.snapshot.arSupported ? "immersive-ar" : "immersive-vr";
+      const session = await navigator.xr.requestSession(mode, {
         requiredFeatures: ["local-floor"],
       });
       this.session = session;
+      this.sessionMode = mode;
       session.addEventListener("end", this.finish);
       this.savedListener = { ...this.experience.listener };
-      this.pause();
+      if (!this.onLocalRest) this.pause();
       this.rig.position.set(
         this.savedListener.x,
         this.savedListener.y - 1.7,
@@ -228,8 +244,8 @@ export class VrRuntime {
       this.state(
         "ready",
         denied
-          ? "VRへの入場が許可されませんでした。Questのブラウザで、もう一度試せます。"
-          : "VRを開始できませんでした。Questの床設定とブラウザを確認し、もう一度試してください。",
+          ? "空間への入場が許可されませんでした。ブラウザの許可を確認し、もう一度試してください。"
+          : "空間を開けませんでした。Questの床設定とブラウザを確認してください。",
       );
     }
   }
@@ -242,6 +258,22 @@ export class VrRuntime {
         "VRを終了できませんでした。Questのシステムメニューから終了できます。",
       );
     }
+  }
+  get canShowAR() {
+    return (
+      this.sessionMode === "immersive-ar" &&
+      this.session?.environmentBlendMode !== "opaque"
+    );
+  }
+  toggleEnvironment() {
+    if (!this.canShowAR) return;
+    const displayMode = this.snapshot.displayMode === "ar" ? "vr" : "ar";
+    this.snapshot = { ...this.snapshot, displayMode };
+    if (this.floor) this.floor.visible = displayMode !== "ar";
+    this.state(this.snapshot.status);
+  }
+  hidePanel() {
+    if (this.panel) this.panel.visible = false;
   }
   private pause() {
     if (this.onLocalRest) {
@@ -284,6 +316,9 @@ export class VrRuntime {
     }
     this.rig.removeFromParent();
     this.session = null;
+    this.sessionMode = null;
+    this.floor = null;
+    this.snapshot = { ...this.snapshot, displayMode: "vr" };
     this.tracked = false;
     this.panel = null;
     this.marker = null;
@@ -316,6 +351,7 @@ export class VrRuntime {
       }),
     );
     floor.rotation.x = -Math.PI / 2;
+    this.floor = floor;
     floor.position.y = 0.01;
     this.rig.add(floor);
     const marker = new THREE.Mesh(
@@ -346,6 +382,7 @@ export class VrRuntime {
       const select = () => this.select(controller);
       const recall = () => {
         this.panelPlaced = false;
+        if (this.panel) this.panel.visible = true;
       };
       controller.addEventListener("selectstart", select);
       controller.addEventListener("squeezestart", recall);
@@ -377,7 +414,7 @@ export class VrRuntime {
     this.raycaster.ray.direction
       .set(0, 0, -1)
       .transformDirection(controller.matrixWorld);
-    if (this.panel) {
+    if (this.panel?.visible) {
       this.panel.updateWorldMatrix(true, false);
       const hit = this.raycaster.intersectObject(this.panel)[0];
       if (hit?.uv) {
@@ -498,7 +535,7 @@ export class VrRuntime {
     this.soundOn = soundOn;
     if (!this.session || !this.panel || !this.ctx || !this.marker) return;
     const info = selected ? aircraftInfo(this.experience, selected) : null;
-    this.marker.visible = !!info?.visible;
+    this.marker.visible = !!info?.visible && this.snapshot.displayMode !== "ar";
     if (info?.visible) {
       const p = this.experience.pose(info.id).position;
       this.marker.position.set(p.x, p.y, p.z);
@@ -522,8 +559,8 @@ export class VrRuntime {
       ctx.font = "bold 32px sans-serif";
       ctx.fillText(panel.title, 30, 47);
       ctx.font = "24px sans-serif";
-      ctx.fillText(panel.status, 30, 90);
-      ctx.fillText(panel.detail, 30, 126);
+      ctx.fillText(panel.status, 30, 90, 964);
+      ctx.fillText(panel.detail, 30, 126, 964);
       for (const b of panel.buttons) {
         ctx.fillStyle = b.enabled === false ? "#1c373a" : "#36585b";
         ctx.fillRect(b.x, b.y, b.w, b.h);
@@ -534,7 +571,7 @@ export class VrRuntime {
       ctx.fillStyle = "#b9d6d0";
       ctx.font = "18px sans-serif";
       ctx.fillText(
-        "グリップ：操作盤を呼ぶ / 次の設定はPCにも反映されます",
+        panel.hint ?? "人差し指：決定 ／ 側面のボタン：操作盤を呼ぶ",
         30,
         505,
       );
@@ -674,6 +711,10 @@ export class VrRuntime {
     panel?.updateWorldMatrix(true, false);
     return {
       ...this.snapshot,
+      sessionMode: this.sessionMode,
+      environmentBlendMode: this.session?.environmentBlendMode ?? null,
+      canShowAR: this.canShowAR,
+      panelVisible: this.panel?.visible ?? false,
       frames: this.frames,
       views: this.views,
       tracked: this.tracked,

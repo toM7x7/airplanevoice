@@ -44,7 +44,7 @@ function skyMaterial() {
 }
 
 /** A static, locally generated environment. Shared flight state is untouched. */
-export function SkyEnvironment() {
+export function SkyEnvironment({ visible = true }: { visible?: boolean }) {
   const { gl, scene } = useThree();
   const sky = useRef<THREE.Mesh>(null);
   const material = useMemo(skyMaterial, []);
@@ -78,7 +78,12 @@ export function SkyEnvironment() {
   useLayoutEffect(() => () => material.dispose(), [material]);
   return (
     <>
-      <mesh ref={sky} material={material} frustumCulled={false}>
+      <mesh
+        ref={sky}
+        material={material}
+        frustumCulled={false}
+        visible={visible}
+      >
         <sphereGeometry args={[18000, 24, 16]} />
       </mesh>
       <hemisphereLight args={["#e5f0ff", "#8a937d", 0.45]} />

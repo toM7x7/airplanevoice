@@ -2,6 +2,7 @@ import {
   ROOM_PROTOCOL,
   type RoomState,
 } from "../../../packages/core/src/shared-room";
+import { visitorKey } from "../../../packages/core/src/room-access";
 
 export class RoomClient {
   constructor() {
@@ -23,6 +24,7 @@ export class RoomClient {
       this.reconnect();
   };
   snapshot = {
+    role: "unknown" as "unknown" | "editor" | "viewer",
     status: "idle",
     state: null as RoomState | null,
     peers: 0,
@@ -61,16 +63,28 @@ export class RoomClient {
     const url = new URL(location.pathname, location.origin);
     url.searchParams.set("shared", "1");
     url.searchParams.set("room", this.id);
+    if (this.snapshot.role === "viewer") url.searchParams.set("visit", "1");
     url.hash = `key=${this.key}`;
     return url.href;
   }
-  async create() {
+  async visitorInvite() {
+    if (this.snapshot.role !== "editor" || !this.snapshot.state?.exhibition)
+      return "";
+    const url = new URL(this.invite);
+    url.searchParams.set("visit", "1");
+    url.hash = `key=${await visitorKey(this.key)}`;
+    return url.href;
+  }
+  async create(exhibition = false) {
     this.update({ status: "connecting", error: "" });
     try {
-      const response = await fetch("/api/rooms", {
-        method: "POST",
-        signal: AbortSignal.timeout(12000),
-      });
+      const response = await fetch(
+        exhibition ? "/api/rooms?exhibition=1" : "/api/rooms",
+        {
+          method: "POST",
+          signal: AbortSignal.timeout(12000),
+        },
+      );
       if (!response.headers.get("content-type")?.includes("application/json"))
         throw new Error(
           "共有サーバーがまだ接続されていません。共有版のURLから開いてください。",
@@ -93,6 +107,7 @@ export class RoomClient {
     }
     this.id = id;
     this.key = key;
+    this.update({ role: "unknown", state: null });
     this.attempts = 0;
     this.connect();
   }
@@ -130,6 +145,11 @@ export class RoomClient {
     ws.onmessage = (event) => {
       try {
         const body = JSON.parse(event.data);
+        if (body.role !== undefined) {
+          if (body.role !== "viewer" && body.role !== "editor")
+            throw new Error("入室の種類を確認できませんでした。");
+          this.update({ role: body.role });
+        }
         this.lastReply = performance.now();
         if (body.type === "pong") {
           const rtt = performance.now() - body.sentAt;
@@ -210,9 +230,15 @@ export class RoomClient {
       | { type: "edit"; recipe: RoomState["draft"] }
       | { type: "launch" | "cancel-next" },
   ): void;
-  send(input: { type: string; recipe?: RoomState["draft"] }) {
+  send(input: { type: "repeat"; enabled: boolean }): void;
+  send(input: {
+    type: string;
+    recipe?: RoomState["draft"];
+    enabled?: boolean;
+  }) {
     if (
       !this.ready ||
+      this.snapshot.role !== "editor" ||
       !this.snapshot.state ||
       this.socket?.readyState !== WebSocket.OPEN
     )

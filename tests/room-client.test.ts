@@ -7,6 +7,42 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+it("reads authority from the compatible state envelope and never sends visitor mutations", () => {
+  class Socket {
+    static OPEN = 1;
+    static instance: Socket;
+    readyState = 1;
+    onmessage: ((event: { data: string }) => void) | null = null;
+    send = vi.fn();
+    close = vi.fn();
+    constructor() {
+      Socket.instance = this;
+    }
+  }
+  vi.stubGlobal("window", new EventTarget());
+  vi.stubGlobal("WebSocket", Socket);
+  vi.stubGlobal("location", new URL("https://test.invalid/"));
+  const client = new RoomClient(),
+    state = newRoom(Date.now(), true);
+  client.join("12345678-1234-1234-1234-123456789012", "0".repeat(64));
+  Socket.instance.onmessage?.({
+    data: JSON.stringify({
+      type: "state",
+      role: "viewer",
+      state,
+      peers: 1,
+      serverNow: Date.now(),
+    }),
+  });
+  expect(client.snapshot.status).toBe("connected");
+  expect(client.snapshot.role).toBe("viewer");
+  expect(Socket.instance.close).not.toHaveBeenCalled();
+  client.send({ type: "repeat", enabled: true });
+  client.send({ type: "edit", recipe: state.draft });
+  expect(Socket.instance.send).not.toHaveBeenCalled();
+  client.dispose();
+});
+
 it("re-anchors time after a suspended client reconnects and forgets old latency samples", () => {
   vi.useFakeTimers();
   let tick = 100;

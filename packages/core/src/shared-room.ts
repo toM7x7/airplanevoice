@@ -8,6 +8,7 @@ import {
 
 export const ROOM_PROTOCOL = "airplanevoice-room-v1";
 export const ROOM_TTL_MS = 60 * 60 * 1000;
+export const EXHIBITION_TTL_MS = 8 * ROOM_TTL_MS;
 export interface SharedFlight {
   id: string;
   recipe: WorkshopRecipe;
@@ -23,9 +24,11 @@ export interface RoomState {
   flights: SharedFlight[];
   expiresAt: number;
   recentOperations: string[];
+  exhibition?: { repeat: boolean };
 }
 export type RoomOperation =
   | { id: string; revision: number; type: "edit"; recipe: WorkshopRecipe }
+  | { id: string; revision: number; type: "repeat"; enabled: boolean }
   | { id: string; revision: number; type: "launch" | "cancel-next" };
 
 export function checkedWorkshop(input: unknown) {
@@ -33,14 +36,15 @@ export function checkedWorkshop(input: unknown) {
   const route = compileRoute(workshopSpec(recipe, 0));
   return { recipe, route };
 }
-export function newRoom(now: number): RoomState {
+export function newRoom(now: number, exhibition = false): RoomState {
   return {
     protocol: ROOM_PROTOCOL,
     revision: 0,
     draft: structuredClone(DEFAULT_WORKSHOP),
     flights: [],
-    expiresAt: now + ROOM_TTL_MS,
+    expiresAt: now + (exhibition ? EXHIBITION_TTL_MS : ROOM_TTL_MS),
     recentOperations: [],
+    ...(exhibition ? { exhibition: { repeat: false } } : {}),
   };
 }
 /** Pure authority transition. Nothing is broadcast until this result is persisted. */
@@ -96,6 +100,10 @@ export function changeRoom(
         checksum: route.checksum,
       },
     ];
+  } else if (op.type === "repeat") {
+    if (!state.exhibition || typeof op.enabled !== "boolean")
+      throw new Error("展示用の部屋で操作してください。");
+    next.exhibition = { repeat: op.enabled };
   } else if (op.type === "cancel-next") {
     if (!state.flights.some((f) => f.startsAt > now))
       throw new Error("取り消す次の便はありません。");
@@ -104,4 +112,29 @@ export function changeRoom(
   next.revision++;
   next.recentOperations = [...state.recentOperations.slice(-31), op.id];
   return next;
+}
+
+/** Called by the server alarm, never by each visitor. Delayed alarms start one new flight. */
+export function advanceExhibition(state: RoomState, now: number): RoomState {
+  if (
+    !state.exhibition?.repeat ||
+    now >= state.expiresAt ||
+    state.flights.some((f) => f.clearAt > now)
+  )
+    return state;
+  return changeRoom(
+    state,
+    {
+      type: "launch",
+      revision: state.revision,
+      id: `automatic-${state.revision}-${Math.floor(now)}`,
+    },
+    now,
+  );
+}
+
+export function nextRoomAlarm(state: RoomState, now: number) {
+  if (!state.exhibition?.repeat) return state.expiresAt;
+  const last = state.flights.at(-1);
+  return Math.min(state.expiresAt, Math.max(now + 100, last?.clearAt ?? now));
 }
