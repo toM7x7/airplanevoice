@@ -13,3 +13,6 @@ output/
 .dev.vars*
 workers/worker-configuration.d.ts
 *.cpuprofile
+
+# Local presentation build scratch (original artifacts remain on disk).
+.circle-build/

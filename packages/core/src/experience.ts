@@ -10,6 +10,7 @@ import {
   type SoundMixMode,
 } from "./airspace";
 import { flightPose } from "./flight";
+import type { SoundTraceMode } from "./sound-presence";
 import { compileShow, type ShowRecipe } from "./show";
 import { distance } from "./math";
 import { TowerDirector, type TowerFact, type TowerCue } from "./tower";
@@ -88,6 +89,8 @@ export interface LogEntry {
 }
 
 export class Experience {
+  soundTraceMode: SoundTraceMode = "soft";
+  setSoundTrace(mode: SoundTraceMode) { this.soundTraceMode = mode; this.notify(); }
   nowMs = 0;
   phase: SessionPhase = "EDIT";
   paused = false;
@@ -119,7 +122,7 @@ export class Experience {
     this.route = compiled.flights[0].route;
     this.aircraftDesign = { ...compiled.recipe.flights[0].recipe.aircraft };
     this.airspace = {
-      aircraftCount: compiled.flights.length as 1 | 2 | 3,
+      aircraftCount: compiled.flights.length,
       spacingSec: 0,
     };
     this.history = [];
@@ -227,7 +230,7 @@ export class Experience {
     });
   }
   get flightIds() {
-    return AIRCRAFT.slice(0, this.airspace.aircraftCount).map((a) => a.id);
+    return this.compiledShow?.flights.map((f) => f.id) ?? AIRCRAFT.slice(0, this.airspace.aircraftCount).map((a) => a.id);
   }
   get durationMs() {
     if (this.compiledShow) return this.compiledShow.durationMs;

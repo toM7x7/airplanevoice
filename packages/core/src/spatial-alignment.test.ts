@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   alignedPoint,
+  checkAlignment,
   DEFAULT_TABLE,
   rotateY,
   solveAlignment,
@@ -9,6 +10,36 @@ import { checkedVenue, DEFAULT_VENUE } from "./venue";
 import { changeRoom, newRoom } from "./shared-room";
 
 describe("shared physical coordinates", () => {
+  it("uses independent C to reject flipped axes and measure residual without fitting scale", () => {
+    const origin = { x: 2, y: 0.82, z: -3 };
+    for (const yaw of [0, Math.PI, 0.71]) {
+      const raw = (x: number, y: number, z: number) => {
+        const d = rotateY({ x, y, z }, -yaw);
+        return { x: d.x + origin.x, y: d.y + origin.y, z: d.z + origin.z };
+      };
+      const alignment = solveAlignment(origin, raw(0.6, 0, 0), DEFAULT_TABLE);
+      const before = structuredClone(alignment);
+      const check = checkAlignment(
+        raw(0.02, 0.01, -0.6),
+        alignment,
+        DEFAULT_TABLE,
+      );
+      expect(check.acceptable).toBe(true);
+      expect(check.delta.x).toBeCloseTo(0.02);
+      expect(check.delta.y).toBeCloseTo(0.01);
+      expect(check.distanceM).toBeCloseTo(Math.sqrt(0.0005));
+      expect(
+        checkAlignment(raw(0, 0, 0.6), alignment, DEFAULT_TABLE).acceptable,
+      ).toBe(false);
+      expect(
+        checkAlignment(raw(0, 0.06, -0.6), alignment, DEFAULT_TABLE).acceptable,
+      ).toBe(false);
+      expect(alignment).toEqual(before);
+      expect(() =>
+        checkAlignment({ x: NaN, y: 0, z: 0 }, alignment, DEFAULT_TABLE),
+      ).toThrow();
+    }
+  });
   it("aligns opposite-facing devices without scaling head movement", () => {
     for (const yaw of [0, Math.PI / 2, Math.PI, -0.71]) {
       const a = { x: 2, y: 0.82, z: -3 };

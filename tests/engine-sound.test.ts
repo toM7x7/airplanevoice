@@ -66,3 +66,21 @@ describe("authored passenger-engine sound", () => {
       expect(() => engineSignal(rate, 4)).toThrow();
   });
 });
+
+it.each([8000, 44100, 48000])("keeps passenger presets close to the shared deep sound at %s Hz", async (rate) => {
+  const { SOUND_CHOICES } = await import("../packages/core/src/creation");
+  const signals = SOUND_CHOICES.map(c => engineSignal(rate, 4, 1, c.sound));
+  const measures = signals.map(s => bands(s, rate));
+  for (const m of measures) {
+    expect(m.rms).toBeCloseTo(.155, 4);
+    expect(m.peak).toBeLessThan(.95);
+  }
+  for (let a=0;a<signals.length;a++) for(let b=a+1;b<signals.length;b++) {
+    let dot=0, aa=0, bb=0;
+    for(let i=0;i<signals[a].length;i++) {
+      dot+=signals[a][i]*signals[b][i];aa+=signals[a][i]**2;bb+=signals[b][i]**2;
+    }
+    expect(Math.abs(dot/Math.sqrt(aa*bb))).toBeGreaterThan(.95);
+  }
+  expect(measures[2].hiss).toBeLessThan(.09);
+});

@@ -1,10 +1,19 @@
 import {
+  DEFAULT_SOUND,
+  type SoundDesign,
+} from "../../../packages/core/src/sound-design";
+import {
   clamp,
   type FlightArrival,
   type FlightId,
   type Vec3,
 } from "../../../packages/core/src";
 import { engineSignal } from "./engine-sound";
+import { SpaceSound, type SoundCue } from "./space-sound";
+import {
+  aircraftVoiceBudget,
+  MAX_AUDIO_VOICES,
+} from "../../../packages/core/src/audio-budget";
 
 export type OutputProfile = "speaker" | "headphones";
 const PROFILES = {
@@ -56,7 +65,7 @@ type Level = ReturnType<Meter["read"]>;
 export class AircraftAudio {
   context: AudioContext | null = null;
   private master: GainNode | null = null;
-  private buffers = new Map<2 | 4, AudioBuffer>();
+  private buffers = new Map<string, AudioBuffer>();
   private presence: BiquadFilterNode | null = null;
   private profile: OutputProfile = "speaker";
   private outputMeter: Meter | null = null;
@@ -76,6 +85,46 @@ export class AircraftAudio {
   }>();
   private volume = 0.35;
   private muted = false;
+  private audition: AudioBufferSourceNode | null = null;
+  private spaceSound: SpaceSound | null = null;
+  ambienceOn = false;
+  interfaceSoundOn = true;
+  speechDucking = true;
+  private speaking = false;
+  setSpeaking = (speaking: boolean) => {
+    if (this.speaking === speaking) return;
+    this.speaking = speaking;
+    this.applyVolume();
+  };
+  setSpeechDucking(on: boolean) {
+    this.speechDucking = on;
+    this.applyVolume();
+  }
+  setAmbience(on: boolean) {
+    this.ambienceOn = on;
+    this.spaceSound?.ambience(on);
+  }
+  feedback(kind: SoundCue = "press", position?: Vec3) {
+    if (
+      this.interfaceSoundOn &&
+      !this.muted &&
+      this.context?.state === "running"
+    )
+      this.spaceSound?.cue(kind, position);
+  }
+  get spaceSoundState() {
+    return {
+      ambience: this.ambienceOn,
+      interface: this.interfaceSoundOn,
+      cues: this.spaceSound?.cues ?? 0,
+      lastCue: this.spaceSound?.lastKind ?? null,
+      speaking: this.speaking,
+      ducking: this.speechDucking,
+      gain: this.muted
+        ? 0
+        : this.volume * (this.speaking && this.speechDucking ? 0.5 : 1),
+    };
+  }
   played = 0;
   skipped = 0;
   get activeVoices() {
@@ -167,6 +216,8 @@ export class AircraftAudio {
         .connect(limiter)
         .connect(this.context.destination);
       this.outputMeter = meter(this.context, limiter);
+      this.spaceSound = new SpaceSound(this.context, this.master);
+      this.spaceSound.ambience(this.ambienceOn);
       for (const count of [2, 4] as const) {
         const signal = engineSignal(this.context.sampleRate, count);
         const buffer = this.context.createBuffer(
@@ -175,26 +226,38 @@ export class AircraftAudio {
           this.context.sampleRate,
         );
         buffer.getChannelData(0).set(signal);
-        this.buffers.set(count, buffer);
+        this.buffers.set(JSON.stringify([count, DEFAULT_SOUND]), buffer);
       }
       this.setVolume(this.volume);
     }
     await this.context.resume();
   }
   setVolume(value: number) {
+    this.audition?.stop();
+    this.audition = null;
     this.volume = clamp(value, 0, 0.7);
     this.applyVolume();
   }
   setMuted(value: boolean) {
+    if (value) {
+      this.audition?.stop();
+      this.audition = null;
+    }
     this.muted = value;
     this.applyVolume();
   }
   private applyVolume() {
     if (this.context && this.master)
       this.master.gain.setTargetAtTime(
-        this.muted ? 0 : this.volume,
+        this.muted
+          ? 0
+          : this.volume * (this.speaking && this.speechDucking ? 0.5 : 1),
         this.context.currentTime,
-        0.03,
+        this.muted || this.volume === 0
+          ? 0.03
+          : this.speaking && this.speechDucking
+            ? 0.08
+            : 0.55,
       );
   }
   setListener(position: Vec3, forward: Vec3, up: Vec3) {
@@ -225,8 +288,22 @@ export class AircraftAudio {
     nowMs: number,
     lowGain: number,
     engines: 2 | 4 = 4,
+    sound: SoundDesign = DEFAULT_SOUND,
   ) {
-    const buffer = this.buffers.get(engines);
+    const key = JSON.stringify([engines, sound]);
+    let buffer = this.buffers.get(key);
+    if (!buffer && this.context) {
+      const signal = engineSignal(this.context.sampleRate, engines, 4, sound);
+      buffer = this.context.createBuffer(
+        1,
+        signal.length,
+        this.context.sampleRate,
+      );
+      buffer.getChannelData(0).set(signal);
+      if (this.buffers.size >= 24)
+        this.buffers.delete(this.buffers.keys().next().value!);
+      this.buffers.set(key, buffer);
+    }
     if (
       !this.context ||
       !buffer ||
@@ -240,8 +317,8 @@ export class AircraftAudio {
     ).length;
     if (
       nowMs - arrival.arrivalAtMs > 250 ||
-      this.voices.size >= 18 ||
-      ownVoices >= 6
+      this.voices.size >= MAX_AUDIO_VOICES ||
+      ownVoices >= aircraftVoiceBudget(this.mixGains, arrival.flightId)
     ) {
       this.skipped++;
       return;
@@ -299,7 +376,51 @@ export class AircraftAudio {
     this.playedByFlight[arrival.flightId] =
       (this.playedByFlight[arrival.flightId] ?? 0) + 1;
   }
+  async preview(
+    engines: 2 | 4,
+    sound: SoundDesign = DEFAULT_SOUND,
+    compare = false,
+  ) {
+    await this.enable();
+    this.audition?.stop();
+    const ctx = this.context!;
+    const tones = compare ? [DEFAULT_SOUND, sound] : [sound];
+    const duration = compare ? 4.35 : 2;
+    const buffer = ctx.createBuffer(
+      1,
+      Math.ceil(ctx.sampleRate * duration),
+      ctx.sampleRate,
+    );
+    const channel = buffer.getChannelData(0);
+    tones.forEach((tone, index) => {
+      const data = engineSignal(ctx.sampleRate, engines, 2, tone);
+      const offset = Math.round(index * 2.35 * ctx.sampleRate);
+      for (let i = 0; i < data.length; i++) {
+        const sec = i / ctx.sampleRate;
+        const envelope = Math.max(
+          0,
+          Math.min(1, sec / 0.15, (1.9 - sec) / 0.4),
+        );
+        channel[offset + i] = data[i] * envelope;
+      }
+    });
+    const source = ctx.createBufferSource(),
+      gain = ctx.createGain();
+    source.buffer = buffer;
+    gain.gain.value = this.volume * 0.5;
+    source.connect(gain).connect(ctx.destination);
+    this.audition = source;
+    source.onended = () => {
+      source.disconnect();
+      gain.disconnect();
+      if (this.audition === source) this.audition = null;
+    };
+    source.start();
+    source.stop(ctx.currentTime + duration);
+  }
   stop() {
+    this.audition?.stop();
+    this.audition = null;
     for (const v of this.voices) {
       v.source.stop();
       v.nodes.forEach((n) => n.disconnect());
@@ -308,6 +429,7 @@ export class AircraftAudio {
   }
   dispose() {
     this.stop();
+    this.spaceSound?.dispose();
     this.outputMeter?.dispose();
     this.busMeters.forEach((meter) => meter.dispose());
     this.busMeters.clear();

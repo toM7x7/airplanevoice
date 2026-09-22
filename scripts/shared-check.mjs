@@ -119,9 +119,16 @@ try {
     );
   };
   const button = async (column, row) => {
-    const { panel, origin } = (await state(b)).vr;
-    const x = (30 + column * 497 + 230) / 1024 - 0.5,
-      y = 0.5 - (157 + row * 81 + 34) / 512,
+    await wait(
+      b,
+      () => JSON.parse(window.render_game_to_text()).vr.controls.progress === 1,
+    );
+    const { panel, origin, controls } = (await state(b)).vr;
+    const hit = controls.targets.filter((t) => t.id.startsWith("action:"))[
+      row * 2 + column
+    ];
+    const x = (hit.x + hit.w / 2) / 1024 - 0.5,
+      y = 0.5 - (hit.y + hit.h / 2) / 512,
       m = panel.matrix;
     const px = x * panel.width,
       py = y * panel.height;
@@ -153,7 +160,8 @@ try {
     await frames();
   };
   assert.equal((await state(b)).vr.views, 2);
-  await button(0, 1); // Edit page.
+  await button(1, 3); // Operator flight settings.
+  await button(0, 0); // Detailed aircraft / route settings.
   await wait(b, () =>
     JSON.parse(window.render_game_to_text()).vr.sharedPage.includes("次の機体"),
   );

@@ -1,0 +1,395 @@
+.av-control-lab {
+  position: relative;
+  width: 100%;
+  height: 100dvh;
+  min-height: 320px;
+  overflow: clip;
+  color: #173f45;
+}
+.av-control-lab .world {
+  position: absolute;
+  inset: 0;
+}
+.av-lab-header {
+  position: absolute;
+  z-index: 2;
+  inset: 24px 32px auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.av-lab-header > div {
+  display: grid;
+  gap: 7px;
+}
+.av-lab-header a {
+  color: #173f45;
+  letter-spacing: 0.18em;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 700;
+}
+.av-lab-header span {
+  font-size: 11px;
+  letter-spacing: 0.03em;
+}
+.av-lab-header button {
+  padding: 12px 18px;
+  border: 1px solid #74938966;
+  border-radius: 24px;
+  background: #f4f2e8eb;
+  color: #173f45;
+  font: inherit;
+}
+.av-lab-header button:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+.av-lab-intro {
+  position: absolute;
+  top: 20%;
+  left: 6%;
+  pointer-events: none;
+  text-shadow: 0 1px 8px #ffffff8c;
+}
+.av-lab-intro p {
+  font-size: clamp(22px, 3vw, 38px);
+  letter-spacing: 0.07em;
+  margin: 0 0 12px;
+  font-weight: 500;
+}
+.av-lab-intro span {
+  font-size: 13px;
+}
+.av-lab-message {
+  position: absolute;
+  inset: auto 20px 114px;
+  margin: 0;
+  text-align: center;
+  pointer-events: none;
+  font-size: 12px;
+  color: #f4f2e8;
+  text-shadow: 0 1px 5px #173f45;
+}
+.av-control-dock {
+  position: absolute;
+  z-index: 3;
+  bottom: max(22px, env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(560px, calc(100% - 32px));
+}
+.av-lab-message[data-menu-open="true"] {
+  bottom: auto;
+  top: 96px;
+  color: #173f45;
+  text-shadow: 0 1px 8px #ffffff;
+}
+.av-control-bar {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  padding: 8px;
+  background: #f4f2e8;
+  border: 1px solid #ffffffa6;
+  border-radius: 40px;
+  box-shadow: 0 10px 35px #102d3333;
+}
+.av-control-button {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+  width: 100%;
+  padding: 17px 14px;
+  border: 1px solid #d5e0d8;
+  border-radius: 14px;
+  background: #e5eeea;
+  color: #173f45;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+.av-control-button > span {
+  display: grid;
+  gap: 7px;
+}
+.av-control-button svg {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+}
+.av-control-button strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+.av-control-button small {
+  font-size: 11px;
+  line-height: 1.7;
+  color: #526e65;
+}
+.av-control-button:hover:enabled {
+  background: #d3e4dd;
+  border-color: #6f9788;
+}
+.av-control-button:disabled {
+  background: #e8e9e1;
+  color: #74847b;
+  cursor: default;
+}
+.av-control-button:disabled small {
+  color: #64756b;
+}
+.av-lab-header > .av-lab-header-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.av-control-button[data-guided="true"] {
+  border: 2px solid #916629;
+  box-shadow: 0 0 0 3px #ad803422;
+  background: #fff9e9;
+}
+.av-control-button > .av-guide-marker {
+  position: absolute;
+  top: -9px;
+  right: 8px;
+  display: block;
+  background: #805b23;
+  color: white;
+  border-radius: 8px;
+  padding: 2px 7px;
+  font-size: 10px;
+}
+.av-guide-above-bar {
+  position: absolute;
+  bottom: calc(100% + 14px);
+  width: 100%;
+}
+.av-guide-card {
+  padding: 16px;
+  margin-bottom: 16px;
+  border: 1px solid #c9d9ce;
+  border-radius: 14px;
+  background: #f4f2e8;
+  color: #173f45;
+}
+.av-guide-above-bar .av-guide-card {
+  margin-bottom: 0;
+}
+.av-guide-card > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.av-guide-card strong {
+  font-size: 12px;
+}
+.av-guide-card button {
+  border: 1px solid #8ea699;
+  border-radius: 10px;
+  padding: 8px 12px;
+  background: transparent;
+  color: #173f45;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+.av-guide-card p {
+  font-size: 15px;
+  line-height: 1.7;
+  margin: 10px 0 6px;
+}
+.av-guide-card small {
+  color: #526e65;
+  font-size: 12px;
+  line-height: 1.6;
+}
+@media (max-width: 600px) {
+  .av-lab-header {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .av-lab-header button {
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+}
+.av-control-button:focus-visible,
+.av-control-close:focus-visible,
+.av-lab-header button:focus-visible {
+  outline: 3px solid #ad8034;
+  outline-offset: 3px;
+}
+.av-control-compact {
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  padding: 14px 6px;
+  min-height: 54px;
+  border-radius: 30px;
+  background: transparent;
+}
+.av-control-compact:disabled {
+  background: transparent;
+}
+.av-control-panel {
+  position: absolute;
+  bottom: calc(100% + 14px);
+  left: 0;
+  right: 0;
+  padding: 24px;
+  background: #f4f2e8;
+  border-radius: 22px;
+  border: 1px solid #ffffffb8;
+  box-shadow: 0 12px 30px #173f4524;
+  transform-origin: center bottom;
+  opacity: 0;
+  transform: translateY(8px);
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 0.12s ease,
+    transform 0.12s ease,
+    visibility 0s 0.12s;
+  max-height: calc(100dvh - 170px);
+  overflow-y: auto;
+}
+.av-control-panel[data-open="true"] {
+  opacity: 1;
+  transform: translateY(0);
+  visibility: visible;
+  pointer-events: auto;
+  transition:
+    opacity 0.18s ease-out,
+    transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1),
+    visibility 0s;
+}
+.av-control-lab[data-menu-open="true"] .av-lab-intro {
+  opacity: 0;
+}
+.av-control-heading {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.av-control-heading p {
+  font-size: 9px;
+  letter-spacing: 0.17em;
+  margin: 0 0 10px;
+}
+.av-control-heading h2 {
+  margin: 0 0 8px;
+  font-size: 22px;
+  font-weight: 600;
+}
+.av-control-heading span {
+  font-size: 12px;
+  color: #526e65;
+}
+.av-control-close {
+  align-self: start;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid #cad8cf;
+  background: transparent;
+  color: #173f45;
+  cursor: pointer;
+}
+.av-control-close svg {
+  width: 18px;
+  height: 18px;
+}
+.av-control-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.av-control-foot {
+  font-size: 10px;
+  margin: 16px 0 0;
+  color: #5e776a;
+}
+.av-control-help {
+  margin: 0 0 20px;
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 2;
+}
+.av-control-content {
+  animation: av-control-appear 0.09s ease-out;
+}
+@keyframes av-control-appear {
+  from {
+    opacity: 0.3;
+    transform: none;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.av-control-dock[data-reduced="true"] * {
+  transition: none !important;
+  animation: none !important;
+}
+@media (max-width: 560px) {
+  .av-lab-header {
+    inset: 16px;
+    bottom: auto;
+    gap: 12px;
+  }
+  .av-lab-header button {
+    max-width: 125px;
+    font-size: 11px;
+  }
+  .av-lab-header span {
+    max-width: 190px;
+    line-height: 1.7;
+  }
+  .av-control-panel {
+    padding: 18px;
+  }
+  .av-control-button {
+    gap: 8px;
+    padding: 12px 10px;
+  }
+  .av-control-button strong {
+    font-size: 12px;
+  }
+  .av-control-button svg {
+    width: 19px;
+    height: 19px;
+    flex-basis: 19px;
+  }
+  .av-control-compact {
+    padding: 12px 4px;
+    gap: 6px;
+  }
+  .av-lab-message {
+    font-size: 10px;
+    bottom: 108px;
+  }
+  .av-lab-intro {
+    top: 22%;
+    left: 24px;
+    right: 24px;
+  }
+}
+.av-control-button:disabled {
+  opacity: 1;
+}
+.av-control-button:active:enabled {
+  background: #c9ddd4;
+}

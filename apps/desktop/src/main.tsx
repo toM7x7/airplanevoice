@@ -2,8 +2,24 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { App } from "./App";
 import "./style.css";
+// Old AI trial links now open the ordinary sky with its assistant.
+const entry = new URL(location.href);
+if (
+  entry.searchParams.get("ui") === "components" &&
+  entry.searchParams.get("ai") === "trial"
+) {
+  entry.searchParams.delete("ui");
+  entry.searchParams.set("ai", "guide");
+  history.replaceState(null, "", entry.pathname + entry.search + entry.hash);
+}
 const SharedApp = React.lazy(() =>
   import("./SharedApp").then((module) => ({ default: module.SharedApp })),
+);
+const ControlLab = React.lazy(() =>
+  import("./ControlLab").then((module) => ({ default: module.ControlLab })),
+);
+const MotionLab = React.lazy(() =>
+  import("./MotionLab").then((module) => ({ default: module.MotionLab })),
 );
 
 class ErrorBoundary extends React.Component<
@@ -28,8 +44,21 @@ class ErrorBoundary extends React.Component<
 }
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <ErrorBoundary>
-    {new URLSearchParams(location.search).has("shared") ||
-    new URLSearchParams(location.search).has("room") ? (
+    {new URLSearchParams(location.search).get("ui") === "motion" ? (
+      <React.Suspense
+        fallback={<main className="fatal">動きの比較を開いています…</main>}
+      >
+        <MotionLab />
+      </React.Suspense>
+    ) : new URLSearchParams(location.search).get("ui") === "components" &&
+      new URLSearchParams(location.search).get("ai") !== "trial" ? (
+      <React.Suspense
+        fallback={<main className="fatal">操作部品の試作を開いています…</main>}
+      >
+        <ControlLab />
+      </React.Suspense>
+    ) : new URLSearchParams(location.search).has("shared") ||
+      new URLSearchParams(location.search).has("room") ? (
       <React.Suspense
         fallback={<main className="fatal">共有する空を開いています…</main>}
       >

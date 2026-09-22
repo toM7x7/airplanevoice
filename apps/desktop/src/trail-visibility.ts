@@ -1,9 +1,10 @@
 import * as THREE from "three";
+import { MAX_AIRCRAFT } from "../../../packages/core/src/airspace";
 
 /** A soft opening around each visible aircraft, evaluated separately for each XR eye. */
 export class TrailVisibility {
   readonly aircraft = {
-    value: Array.from({ length: 3 }, () => new THREE.Vector4()),
+    value: Array.from({ length: MAX_AIRCRAFT }, () => new THREE.Vector4()),
   };
 
   apply<T extends THREE.Material>(material: T, instanceFade = false): T {
@@ -24,14 +25,14 @@ export class TrailVisibility {
       }
       shader.fragmentShader = `
         varying vec3 vTrailViewPosition;
-        uniform vec4 trailAircraft[3];
+        uniform vec4 trailAircraft[${MAX_AIRCRAFT}];
         ${shader.fragmentShader}`;
       shader.fragmentShader = shader.fragmentShader.replace(
         "#include <opaque_fragment>",
         `
         vec3 trailRay = normalize(vTrailViewPosition);
         float clearance = 1.0;
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < ${MAX_AIRCRAFT}; i++) {
           vec4 aircraft = trailAircraft[i];
           if (aircraft.w <= 0.0) continue;
           vec3 centre = (viewMatrix * vec4(aircraft.xyz, 1.0)).xyz;
@@ -48,7 +49,7 @@ export class TrailVisibility {
       );
     };
     material.customProgramCacheKey = () =>
-      `sound-trail-aircraft-clearance-v2-${instanceFade}`;
+      `sound-trail-aircraft-clearance-v3-${MAX_AIRCRAFT}-${instanceFade}`;
     return material;
   }
 }

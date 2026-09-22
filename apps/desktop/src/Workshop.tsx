@@ -1,3 +1,4 @@
+import { CreationShelf } from "./CreationShelf";
 import { useState } from "react";
 import {
   DEFAULT_WORKSHOP,
@@ -66,6 +67,15 @@ export function Workshop({
   const anchors = e.spec.generator ?? draft.route;
   return (
     <section className="workshop-panel" aria-label="つくる実験室">
+      <CreationShelf
+        recipe={current()}
+        enabled={e.canEdit}
+        onLoad={(recipe) => {
+          e.applyWorkshop(recipe);
+          setDraft(recipe);
+          onSave();
+        }}
+      />
       <div className="segmented workshop-tabs">
         <button
           aria-pressed={tab === "aircraft"}

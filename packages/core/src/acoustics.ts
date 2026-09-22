@@ -68,4 +68,9 @@ export class ArrivalQueue {
   get remaining(): number {
     return this.emissions.length - this.consumed.size;
   }
+  /** Keep emitted/pending sound at its original position while replacing future motion. */
+  replaceFuture(emissions: SoundEmission[], nowMs: number) {
+    for(let i=0;i<this.emissions.length;i++)
+      if(this.emissions[i].emitAtMs>nowMs && !this.consumed.has(this.emissions[i].id) && emissions[i]) this.emissions[i]=emissions[i];
+  }
 }

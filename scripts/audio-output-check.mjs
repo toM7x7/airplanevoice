@@ -12,7 +12,7 @@ if (
     "The historical baseline must be recorded from the v0.5.0 checkout.",
   );
 const coreUrl = `/@fs/${path.resolve("packages/core/src/index.ts").replaceAll("\\", "/")}`;
-const out = "output/audio-output";
+const out = process.env.AUDIO_OUTPUT || "output/audio-output";
 await fs.mkdir(out, { recursive: true });
 const browser = await chromium.launch({
   headless: true,
@@ -35,6 +35,9 @@ try {
         { count: 3 },
         { count: 3, stress: true },
         { count: 3, headphones: true },
+        { count: 6, stress: true },
+        { count: 12, stress: true },
+        { count: 24, stress: true },
       ];
   for (const { count, stress = false, headphones = false } of cases) {
     const result = await page.evaluate(
@@ -220,7 +223,7 @@ try {
         "Each plane must produce a waveform during the same samples",
       );
     assert(result.mean.output.peak < 0.98, "Output must retain headroom");
-    assert(result.maxVoices <= count * 6, "Voice budgets must remain bounded");
+    assert(result.maxVoices <= Math.min(24, count * 6), "Voice budgets must remain bounded");
     if (!baseline) {
       assert(
         result.mutedRms < 0.00001 && result.zeroVolumeRms < 0.00001,

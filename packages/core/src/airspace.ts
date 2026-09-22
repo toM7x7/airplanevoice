@@ -3,14 +3,48 @@ import { add, checksum } from "./math";
 import type { CompiledRoute, SoundArrival } from "./types";
 import type { CompiledShowFlight } from "./show";
 
+export const MAX_AIRCRAFT = 24;
+export type FlightId =
+  | "ST-01"
+  | "ST-02"
+  | "ST-03"
+  | "ST-04"
+  | "ST-05"
+  | "ST-06"
+  | "ST-07"
+  | "ST-08"
+  | "ST-09"
+  | "ST-10"
+  | "ST-11"
+  | "ST-12"
+  | "ST-13"
+  | "ST-14"
+  | "ST-15"
+  | "ST-16"
+  | "ST-17"
+  | "ST-18"
+  | "ST-19"
+  | "ST-20"
+  | "ST-21"
+  | "ST-22"
+  | "ST-23"
+  | "ST-24";
 export const AIRCRAFT = [
   { id: "ST-01", accent: "#205963", offset: { x: 0, y: 0, z: 0 } },
   { id: "ST-02", accent: "#9b5837", offset: { x: 480, y: 85, z: -420 } },
   { id: "ST-03", accent: "#665397", offset: { x: -560, y: 165, z: -780 } },
+  ...Array.from({ length: MAX_AIRCRAFT - 3 }, (_, n) => ({
+    id: `ST-${String(n + 4).padStart(2, "0")}` as FlightId,
+    accent: ["#205963", "#9b5837", "#665397"][n % 3],
+    offset: {
+      x: (n % 2 ? -1 : 1) * (700 + n * 120),
+      y: 80 + (n % 4) * 60,
+      z: -900 - n * 160,
+    },
+  })),
 ] as const;
-export type FlightId = (typeof AIRCRAFT)[number]["id"];
 export interface AirspaceConfig {
-  aircraftCount: 1 | 2 | 3;
+  aircraftCount: number;
   spacingSec: 0 | 8 | 16;
 }
 export interface FlightArrival extends SoundArrival {
@@ -28,7 +62,9 @@ export interface FlightPlan {
 }
 export function validAirspace(config: AirspaceConfig): boolean {
   return (
-    [1, 2, 3].includes(config.aircraftCount) &&
+    Number.isInteger(config.aircraftCount) &&
+    config.aircraftCount >= 1 &&
+    config.aircraftCount <= MAX_AIRCRAFT &&
     [0, 8, 16].includes(config.spacingSec)
   );
 }
@@ -68,7 +104,7 @@ export function buildAirspace(
     const start =
       startAtMs + (planned?.startSec ?? index * config.spacingSec) * 1000;
     return {
-      id: aircraft.id,
+      id: planned?.id ?? aircraft.id,
       accent: aircraft.accent,
       route: flownRoute,
       startAtMs: start,
@@ -80,7 +116,7 @@ export function buildAirspace(
   });
 }
 
-export type SoundMixMode = "focus" | "balanced";
+export type SoundMixMode = "focus" | "balanced" | "solo";
 export function soundMix(
   ids: readonly FlightId[],
   mode: SoundMixMode,
@@ -91,11 +127,11 @@ export function soundMix(
     new Set(ids).size !== ids.length ||
     !ids.every((id) => AIRCRAFT.some((a) => a.id === id)) ||
     !ids.includes(focus) ||
-    !["focus", "balanced"].includes(mode)
+    !["focus", "balanced", "solo"].includes(mode)
   )
     throw new Error("Invalid sound mix");
-  const weights = ids.map((id) =>
-    mode === "balanced" || id === focus ? 1 : 0.24,
+  const weights: number[] = ids.map((id) =>
+    mode === "balanced" || id === focus ? 1 : mode === "solo" ? 0 : 0.24,
   );
   const norm = Math.sqrt(weights.reduce((sum, w) => sum + w * w, 0));
   return Object.fromEntries(ids.map((id, i) => [id, weights[i] / norm]));

@@ -10,7 +10,7 @@ function skyMaterial() {
   return new THREE.ShaderMaterial({
     side: THREE.BackSide,
     depthWrite: false,
-    uniforms: { sunDirection: { value: SUN_DIRECTION } },
+    uniforms: { sunDirection: { value: SUN_DIRECTION }, skyOnly: { value: 0 } },
     vertexShader: `varying vec3 skyDirection;
       void main() {
         skyDirection = position;
@@ -18,9 +18,10 @@ function skyMaterial() {
       }`,
     fragmentShader: `varying vec3 skyDirection;
       uniform vec3 sunDirection;
+      uniform float skyOnly;
       void main() {
         vec3 d = normalize(skyDirection);
-        float elevation = max(d.y, 0.0);
+        float elevation = max(d.y, skyOnly * 0.22);
         vec3 horizon = vec3(0.64, 0.76, 0.84);
         vec3 zenith = vec3(0.095, 0.27, 0.50);
         vec3 sky = mix(horizon, zenith, pow(elevation, 0.42));
@@ -36,6 +37,7 @@ function skyMaterial() {
         // The same ground hemisphere provides soft reflected fill to the belly.
         vec3 ground = mix(vec3(0.14, 0.18, 0.15), horizon, exp(min(d.y, 0.0) * 16.0));
         vec3 radiance = mix(ground, sky, smoothstep(-0.02, 0.01, d.y));
+        radiance = mix(radiance, sky, skyOnly);
         gl_FragColor = vec4(radiance, 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
@@ -44,7 +46,13 @@ function skyMaterial() {
 }
 
 /** A static, locally generated environment. Shared flight state is untouched. */
-export function SkyEnvironment({ visible = true }: { visible?: boolean }) {
+export function SkyEnvironment({
+  visible = true,
+  skyOnly = false,
+}: {
+  visible?: boolean;
+  skyOnly?: boolean;
+}) {
   const { gl, scene } = useThree();
   const sky = useRef<THREE.Mesh>(null);
   const material = useMemo(skyMaterial, []);
@@ -76,6 +84,10 @@ export function SkyEnvironment({ visible = true }: { visible?: boolean }) {
     };
   }, [gl, scene, material]);
   useLayoutEffect(() => () => material.dispose(), [material]);
+  // Display-only comparison: the captured lighting environment stays identical.
+  useLayoutEffect(() => {
+    material.uniforms.skyOnly.value = skyOnly ? 1 : 0;
+  }, [material, skyOnly]);
   return (
     <>
       <mesh

@@ -1,0 +1,25 @@
+import {chromium} from 'playwright';import assert from 'node:assert/strict';import fs from 'node:fs/promises';
+const out='output/2026-09-23/overlap';await fs.mkdir(out,{recursive:true});
+const b=await chromium.launch({headless:true,args:['--use-angle=d3d11','--autoplay-policy=no-user-gesture-required']});
+try {const p=await b.newPage({viewport:{width:1440,height:1000}});p.setDefaultTimeout(60000);const errors=[];p.on('pageerror',e=>errors.push(e.message));
+ await p.goto(process.env.SHARED_URL||'http://127.0.0.1:8787/?shared=1');
+ const s=()=>p.evaluate(()=>JSON.parse(window.render_game_to_text()));
+ await p.getByRole('button',{name:'この機体を飛ばす',exact:true}).click();
+ await p.waitForFunction(()=>JSON.parse(window.render_game_to_text()).phase==='FLY').catch(async e=>{const v=await s();console.log({phase:v.phase,roomStatus:v.room.status,roomError:v.room.error,flights:v.room.state?.flights,creation:v.creationMessage});await p.screenshot({path:out+'/failure.png'});throw e;});
+ const first=(await s()).room.state.flights[0];
+ await p.getByRole('button',{name:'この機体を編集',exact:true}).click();
+ await p.getByRole('navigation',{name:'機体の編集項目'}).getByRole('button',{name:/名前/}).click();
+ const name=p.getByRole('textbox',{name:'制作中の機体の名前'});await name.fill('二機目・あおぞら');await name.press('Tab');
+ await p.getByRole('button',{name:'格納庫に保存',exact:true}).click();
+ const before=Date.now();await p.getByRole('button',{name:'この機体を飛ばす',exact:true}).click();
+ await p.waitForFunction(()=>JSON.parse(window.render_game_to_text()).room.state.flights.length===2);
+ const second=(await s()).room.state.flights[1];assert(Math.abs(second.startsAt-before-15000)<2000);
+ assert.equal((await s()).room.state.flights[0].id,first.id);
+ await p.waitForFunction(()=>JSON.parse(window.render_game_to_text()).fleet.filter(f=>f.started&&!f.ended).length===2);
+ await p.screenshot({path:out+'/two-aircraft.png'});
+ assert(await p.getByRole('button',{name:'二機目・あおぞら · 飛行中',exact:true}).isVisible());
+ await p.getByRole('button',{name:'この機体を編集',exact:true}).click();
+ const dropdown=p.getByRole('combobox',{name:'保存した機体を呼び出す'});assert(await dropdown.isVisible());await dropdown.selectOption({index:1});
+ await p.getByRole('button',{name:'この機体を使う',exact:true}).click();assert.equal((await s()).creation.entry.name,'二機目・あおぞら');
+ assert.deepEqual(errors,[]);await fs.writeFile(out+'/result.json',JSON.stringify({checks:['15 second dispatch','two simultaneous aircraft','named flight roster','saved aircraft dropdown recall'],errors},null,2));console.log('PASS overlapping flights and saved aircraft recall');
+} finally {await b.close();}
