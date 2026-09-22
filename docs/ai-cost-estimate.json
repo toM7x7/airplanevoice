@@ -1,0 +1,537 @@
+{
+  "rateDate": "2026-09-18",
+  "selectedArchitecture": "gpt-live-1 human assist + independent TypeSafe flight observer",
+  "backendEstimateModel": "gpt-4.1-mini (optional, not a final model selection)",
+  "yenPerUsd": 160,
+  "rates": {
+    "mini": {
+      "audioIn": 10,
+      "audioOut": 20,
+      "textIn": 0.6,
+      "textOut": 2.4
+    },
+    "standard": {
+      "audioIn": 32,
+      "audioOut": 64,
+      "textIn": 4,
+      "textOut": 24
+    },
+    "text": {
+      "input": 0.4,
+      "output": 1.6
+    },
+    "livePerMinute": 0.05,
+    "transcribePerMinute": 0.003,
+    "jevInput": 0.042,
+    "aivisPerCharacterYen": 0.044
+  },
+  "assumptions": {
+    "secondsPerSession": 90,
+    "responsesPerSession": 3,
+    "userSecondsPerResponse": 12,
+    "assistantSecondsPerResponse": 12,
+    "baseInputTextTokensPerResponse": 2000,
+    "outputTextTokensPerResponse": 120,
+    "aivisCharactersPerResponse": 80,
+    "jevCallsPerSession": 3,
+    "jevInputTokensPerCall": 1000,
+    "cacheDiscount": false,
+    "planningMultiplier": 2
+  },
+  "observationAssumptions": {
+    "intervalSeconds": 10,
+    "minimumIntervalSeconds": 5,
+    "callsPerSnapshot": 1,
+    "inputTokensPerCall": 1000,
+    "retries": 0
+  },
+  "tokensPerSession": {
+    "audioIn": 1440,
+    "audioOut": 720,
+    "textIn": 6360,
+    "textOut": 360
+  },
+  "selectedScenarios": [
+    {
+      "label": "small-20-one-hour",
+      "conversations": 20,
+      "secondsPerConversation": 90,
+      "voiceMinutes": 30,
+      "observationHours": 1,
+      "independentWorlds": 1,
+      "typesafeCalls": 360,
+      "components": {
+        "voice": {
+          "calculatedYen": 240,
+          "exactYen": 240,
+          "planningYen": 500
+        },
+        "optionalTextBackend": {
+          "calculatedYen": 10,
+          "exactYen": 9.984,
+          "planningYen": 100
+        },
+        "observation": {
+          "calculatedYen": 2,
+          "exactYen": 2.4192,
+          "planningYen": 100
+        }
+      },
+      "liveAndObservation": {
+        "calculatedYen": 242,
+        "exactYen": 242.4192,
+        "planningYen": 500
+      },
+      "withTextBackend": {
+        "calculatedYen": 252,
+        "exactYen": 252.4032,
+        "planningYen": 600
+      }
+    },
+    {
+      "label": "exhibition-100-eight-hours",
+      "conversations": 100,
+      "secondsPerConversation": 90,
+      "voiceMinutes": 150,
+      "observationHours": 8,
+      "independentWorlds": 1,
+      "typesafeCalls": 2880,
+      "components": {
+        "voice": {
+          "calculatedYen": 1200,
+          "exactYen": 1200,
+          "planningYen": 2400
+        },
+        "optionalTextBackend": {
+          "calculatedYen": 50,
+          "exactYen": 49.92,
+          "planningYen": 100
+        },
+        "observation": {
+          "calculatedYen": 19,
+          "exactYen": 19.3536,
+          "planningYen": 100
+        }
+      },
+      "liveAndObservation": {
+        "calculatedYen": 1219,
+        "exactYen": 1219.3536,
+        "planningYen": 2500
+      },
+      "withTextBackend": {
+        "calculatedYen": 1269,
+        "exactYen": 1269.2736,
+        "planningYen": 2600
+      }
+    },
+    {
+      "label": "one-device-8h",
+      "conversations": 320,
+      "secondsPerConversation": 90,
+      "voiceMinutes": 480,
+      "observationHours": 8,
+      "independentWorlds": 1,
+      "typesafeCalls": 2880,
+      "components": {
+        "voice": {
+          "calculatedYen": 3840,
+          "exactYen": 3840,
+          "planningYen": 7700
+        },
+        "optionalTextBackend": {
+          "calculatedYen": 160,
+          "exactYen": 159.744,
+          "planningYen": 400
+        },
+        "observation": {
+          "calculatedYen": 19,
+          "exactYen": 19.3536,
+          "planningYen": 100
+        }
+      },
+      "liveAndObservation": {
+        "calculatedYen": 3859,
+        "exactYen": 3859.3536,
+        "planningYen": 7800
+      },
+      "withTextBackend": {
+        "calculatedYen": 4019,
+        "exactYen": 4019.0976,
+        "planningYen": 8100
+      }
+    },
+    {
+      "label": "four-devices-one-world-8h",
+      "conversations": 1280,
+      "secondsPerConversation": 90,
+      "voiceMinutes": 1920,
+      "observationHours": 8,
+      "independentWorlds": 1,
+      "typesafeCalls": 2880,
+      "components": {
+        "voice": {
+          "calculatedYen": 15360,
+          "exactYen": 15360,
+          "planningYen": 30800
+        },
+        "optionalTextBackend": {
+          "calculatedYen": 639,
+          "exactYen": 638.976,
+          "planningYen": 1300
+        },
+        "observation": {
+          "calculatedYen": 19,
+          "exactYen": 19.3536,
+          "planningYen": 100
+        }
+      },
+      "liveAndObservation": {
+        "calculatedYen": 15379,
+        "exactYen": 15379.3536,
+        "planningYen": 30800
+      },
+      "withTextBackend": {
+        "calculatedYen": 16018,
+        "exactYen": 16018.3296,
+        "planningYen": 32100
+      }
+    },
+    {
+      "label": "four-devices-four-worlds-8h",
+      "conversations": 1280,
+      "secondsPerConversation": 90,
+      "voiceMinutes": 1920,
+      "observationHours": 8,
+      "independentWorlds": 4,
+      "typesafeCalls": 11520,
+      "components": {
+        "voice": {
+          "calculatedYen": 15360,
+          "exactYen": 15360,
+          "planningYen": 30800
+        },
+        "optionalTextBackend": {
+          "calculatedYen": 639,
+          "exactYen": 638.976,
+          "planningYen": 1300
+        },
+        "observation": {
+          "calculatedYen": 77,
+          "exactYen": 77.4144,
+          "planningYen": 200
+        }
+      },
+      "liveAndObservation": {
+        "calculatedYen": 15437,
+        "exactYen": 15437.4144,
+        "planningYen": 30900
+      },
+      "withTextBackend": {
+        "calculatedYen": 16076,
+        "exactYen": 16076.3904,
+        "planningYen": 32200
+      }
+    }
+  ],
+  "durationSensitivity": [
+    {
+      "label": "100-conversations-90s",
+      "conversations": 100,
+      "secondsPerConversation": 90,
+      "voiceMinutes": 150,
+      "observationHours": 8,
+      "independentWorlds": 1,
+      "typesafeCalls": 2880,
+      "components": {
+        "voice": {
+          "calculatedYen": 1200,
+          "exactYen": 1200,
+          "planningYen": 2400
+        },
+        "optionalTextBackend": {
+          "calculatedYen": 50,
+          "exactYen": 49.92,
+          "planningYen": 100
+        },
+        "observation": {
+          "calculatedYen": 19,
+          "exactYen": 19.3536,
+          "planningYen": 100
+        }
+      },
+      "liveAndObservation": {
+        "calculatedYen": 1219,
+        "exactYen": 1219.3536,
+        "planningYen": 2500
+      },
+      "withTextBackend": {
+        "calculatedYen": 1269,
+        "exactYen": 1269.2736,
+        "planningYen": 2600
+      }
+    },
+    {
+      "label": "100-conversations-180s",
+      "conversations": 100,
+      "secondsPerConversation": 180,
+      "voiceMinutes": 300,
+      "observationHours": 8,
+      "independentWorlds": 1,
+      "typesafeCalls": 2880,
+      "components": {
+        "voice": {
+          "calculatedYen": 2400,
+          "exactYen": 2400,
+          "planningYen": 4800
+        },
+        "optionalTextBackend": {
+          "calculatedYen": 50,
+          "exactYen": 49.92,
+          "planningYen": 100
+        },
+        "observation": {
+          "calculatedYen": 19,
+          "exactYen": 19.3536,
+          "planningYen": 100
+        }
+      },
+      "liveAndObservation": {
+        "calculatedYen": 2419,
+        "exactYen": 2419.3536,
+        "planningYen": 4900
+      },
+      "withTextBackend": {
+        "calculatedYen": 2469,
+        "exactYen": 2469.2736,
+        "planningYen": 5000
+      }
+    },
+    {
+      "label": "100-conversations-300s",
+      "conversations": 100,
+      "secondsPerConversation": 300,
+      "voiceMinutes": 500,
+      "observationHours": 8,
+      "independentWorlds": 1,
+      "typesafeCalls": 2880,
+      "components": {
+        "voice": {
+          "calculatedYen": 4000,
+          "exactYen": 4000,
+          "planningYen": 8000
+        },
+        "optionalTextBackend": {
+          "calculatedYen": 50,
+          "exactYen": 49.92,
+          "planningYen": 100
+        },
+        "observation": {
+          "calculatedYen": 19,
+          "exactYen": 19.3536,
+          "planningYen": 100
+        }
+      },
+      "liveAndObservation": {
+        "calculatedYen": 4019,
+        "exactYen": 4019.3536,
+        "planningYen": 8100
+      },
+      "withTextBackend": {
+        "calculatedYen": 4069,
+        "exactYen": 4069.2736,
+        "planningYen": 8200
+      }
+    }
+  ],
+  "observationSensitivity": [
+    {
+      "hours": 8,
+      "independentWorlds": 1,
+      "intervalSeconds": 30,
+      "calls": 960,
+      "typesafeOnly": {
+        "calculatedYen": 6,
+        "exactYen": 6.4512,
+        "planningYen": 100
+      },
+      "withOptionalTextEverySnapshot": {
+        "calculatedYen": 159,
+        "exactYen": 158.8224,
+        "planningYen": 400
+      }
+    },
+    {
+      "hours": 8,
+      "independentWorlds": 1,
+      "intervalSeconds": 10,
+      "calls": 2880,
+      "typesafeOnly": {
+        "calculatedYen": 19,
+        "exactYen": 19.3536,
+        "planningYen": 100
+      },
+      "withOptionalTextEverySnapshot": {
+        "calculatedYen": 476,
+        "exactYen": 476.4672,
+        "planningYen": 1000
+      }
+    },
+    {
+      "hours": 8,
+      "independentWorlds": 1,
+      "intervalSeconds": 5,
+      "calls": 5760,
+      "typesafeOnly": {
+        "calculatedYen": 39,
+        "exactYen": 38.7072,
+        "planningYen": 100
+      },
+      "withOptionalTextEverySnapshot": {
+        "calculatedYen": 953,
+        "exactYen": 952.9344,
+        "planningYen": 2000
+      }
+    }
+  ],
+  "historicalPerConversationComparisons": [
+    {
+      "label": "small-20",
+      "sessions": 20,
+      "voiceMinutes": 30,
+      "costs": {
+        "buttonsAndLocalGuide": {
+          "calculatedYen": 0,
+          "planningYen": 0
+        },
+        "textAndLocalVoice": {
+          "calculatedYen": 10,
+          "planningYen": 100
+        },
+        "realtimeMini": {
+          "calculatedYen": 108,
+          "planningYen": 300
+        },
+        "realtimeStandard": {
+          "calculatedYen": 404,
+          "planningYen": 900
+        },
+        "liveWithTextBackend": {
+          "calculatedYen": 250,
+          "planningYen": 600
+        },
+        "aivisWithTranscriptionAndText": {
+          "calculatedYen": 227,
+          "planningYen": 500
+        }
+      }
+    },
+    {
+      "label": "exhibition-100",
+      "sessions": 100,
+      "voiceMinutes": 150,
+      "costs": {
+        "buttonsAndLocalGuide": {
+          "calculatedYen": 0,
+          "planningYen": 0
+        },
+        "textAndLocalVoice": {
+          "calculatedYen": 52,
+          "planningYen": 200
+        },
+        "realtimeMini": {
+          "calculatedYen": 538,
+          "planningYen": 1100
+        },
+        "realtimeStandard": {
+          "calculatedYen": 2022,
+          "planningYen": 4100
+        },
+        "liveWithTextBackend": {
+          "calculatedYen": 1252,
+          "planningYen": 2600
+        },
+        "aivisWithTranscriptionAndText": {
+          "calculatedYen": 1137,
+          "planningYen": 2300
+        }
+      }
+    },
+    {
+      "label": "one-device-8h",
+      "sessions": 320,
+      "voiceMinutes": 480,
+      "costs": {
+        "buttonsAndLocalGuide": {
+          "calculatedYen": 0,
+          "planningYen": 0
+        },
+        "textAndLocalVoice": {
+          "calculatedYen": 166,
+          "planningYen": 400
+        },
+        "realtimeMini": {
+          "calculatedYen": 1721,
+          "planningYen": 3500
+        },
+        "realtimeStandard": {
+          "calculatedYen": 6470,
+          "planningYen": 13000
+        },
+        "liveWithTextBackend": {
+          "calculatedYen": 4006,
+          "planningYen": 8100
+        },
+        "aivisWithTranscriptionAndText": {
+          "calculatedYen": 3638,
+          "planningYen": 7300
+        }
+      }
+    },
+    {
+      "label": "four-devices-8h",
+      "sessions": 1280,
+      "voiceMinutes": 1920,
+      "costs": {
+        "buttonsAndLocalGuide": {
+          "calculatedYen": 0,
+          "planningYen": 0
+        },
+        "textAndLocalVoice": {
+          "calculatedYen": 665,
+          "planningYen": 1400
+        },
+        "realtimeMini": {
+          "calculatedYen": 6883,
+          "planningYen": 13800
+        },
+        "realtimeStandard": {
+          "calculatedYen": 25880,
+          "planningYen": 51800
+        },
+        "liveWithTextBackend": {
+          "calculatedYen": 16025,
+          "planningYen": 32100
+        },
+        "aivisWithTranscriptionAndText": {
+          "calculatedYen": 14550,
+          "planningYen": 29200
+        }
+      }
+    }
+  ],
+  "exclusions": [
+    "USD-provider taxes and FX fees",
+    "Cloudflare overages or plan change",
+    "unknown future MCP provider fees",
+    "initial development/evaluation calls"
+  ],
+  "limitations": [
+    "Planning multiplier is not a guaranteed maximum or configured spending limit.",
+    "Extra tool responses, reconnects, and longer context change costs.",
+    "Eight-hour rows assume separate 90-second sessions, not unbounded conversation history.",
+    "Primary observation cost is per world, not per participant. Solo worlds each need an observer.",
+    "One TypeSafe call per snapshot, no retry. Extra classifiers and per-viewpoint judgments add cost.",
+    "WebRTC initialization is included in normal 90-second sessions; failed or short starts may add cost.",
+    "Optional text generation on every snapshot is a sensitivity case, not the selected default."
+  ]
+}

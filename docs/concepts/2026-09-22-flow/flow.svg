@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="860" viewBox="0 0 1440 860">
+<defs><linearGradient id="sky" x2="0" y2="1"><stop stop-color="#8bbbd0"/><stop offset="1" stop-color="#e9efe6"/></linearGradient><g id="plane"><path d="M0-85 Q9-82 10-55 L12-15 85 27 85 38 12 14 9 65 34 83 34 91 0 80-34 91-34 83-9 65-12 14-85 38-85 27-12-15-10-55Q-9-82 0-85Z" fill="#f9faf6" stroke="#416472" stroke-width="2"/></g></defs>
+<rect width="1440" height="860" fill="#f2efe7"/>
+<g font-family="Yu Gothic,Meiryo,sans-serif" fill="#203b43">
+<text x="50" y="54" font-size="17" letter-spacing="3">AIRPLANEVOICE / 体験の設計図</text>
+<text x="50" y="106" font-size="32" font-weight="bold">つくる場所と、見惚れる場所を分ける。</text>
+<text x="50" y="141" font-size="17">構成ワイヤー案 · 実装画面ではありません · 模型の絵は配置説明用</text>
+<rect x="50" y="180" width="420" height="400" rx="16" fill="#d9e0dc"/>
+<text x="74" y="216" font-size="23" font-weight="bold">01 格納庫 — つくる</text>
+<path d="M74 400H446M120 246V450M400 246V450M74 450H446" stroke="#b4c3bc" fill="none"/>
+<ellipse cx="235" cy="428" rx="123" ry="23" fill="#b3c5bc"/>
+<use href="#plane" transform="translate(237 348) rotate(-38) scale(1.02)"/>
+<rect x="72" y="464" width="376" height="42" rx="9" fill="#fffdf7"/>
+<text x="95" y="491" font-size="17">形　｜　音　｜　名前　　↶ 戻す</text>
+<text x="74" y="539" font-size="16">ドラッグで回す · 拡大 · 正面へ戻す</text>
+<text x="478" y="384" font-size="29">→</text>
+<rect x="510" y="180" width="420" height="400" rx="16" fill="#dce8e9"/>
+<text x="534" y="216" font-size="23" font-weight="bold">02 試し聴き — くらべる</text>
+<path d="M539 365Q720 242 897 365" fill="none" stroke="#5d9197" stroke-width="3" stroke-dasharray="6 8"/>
+<use href="#plane" transform="translate(735 306) rotate(90) scale(.35)"/>
+<circle cx="720" cy="412" r="12" fill="#246974"/>
+<path d="M696 408Q692 385 710 381M744 408Q748 385 730 381" fill="none" stroke="#246974" stroke-width="2"/>
+<text x="750" y="418" font-size="15">聴く位置は固定</text>
+<rect x="534" y="464" width="169" height="42" rx="9" fill="#fffdf7"/><rect x="714" y="464" width="191" height="42" rx="9" fill="#246974"/>
+<text x="551" y="491" font-size="17">▶ 変更前の音</text><text x="732" y="491" font-size="17" fill="white">▶ 今つくった音</text>
+<text x="534" y="539" font-size="16">同じコース・距離で、違いを聴く</text>
+<text x="937" y="384" font-size="29">→</text>
+<rect x="970" y="180" width="420" height="400" rx="16" fill="url(#sky)"/>
+<text x="994" y="216" font-size="23" font-weight="bold">03 空 — 見上げて聴く</text>
+<use href="#plane" transform="translate(1170 307) rotate(48) scale(.42)"/>
+<path d="M983 478Q1110 443 1220 481T1390 474V565H983Z" fill="#afbd9b"/>
+<rect x="1053" y="496" width="251" height="42" rx="21" fill="#fffdf7"/>
+<text x="1077" y="522" font-size="16">☰ メニュー　　音を調整</text>
+<text x="994" y="563" font-size="14">普段は景色と音だけ。必要な時に開く。</text>
+<path d="M1177 600V622H257V600" fill="none" stroke="#246974" stroke-width="2"/>
+<text x="506" y="651" font-size="20">気になった音を持ち帰って、もう一度つくる</text>
+<text x="50" y="712" font-size="20" font-weight="bold">PC</text><text x="120" y="712" font-size="18">大きな模型＋詳細編集。画面とカメラを切り替える。</text>
+<text x="50" y="754" font-size="20" font-weight="bold">VR</text><text x="120" y="754" font-size="18">手元の模型＋少数の選択肢 → 観察空間。頭を勝手に動かさない。</text>
+<text x="50" y="796" font-size="20" font-weight="bold">AR</text><text x="120" y="796" font-size="18">現実の背景を保ち、制作時だけ小さな作業台を呼び出す。</text>
+<text x="1000" y="835" font-size="13">試し聴きは任意 · すぐ飛ばす／見るも可能</text>
+</g></svg>
