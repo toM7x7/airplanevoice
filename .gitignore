@@ -16,3 +16,6 @@ workers/worker-configuration.d.ts
 
 # Local presentation build scratch (original artifacts remain on disk).
 .circle-build/
+
+# Release-attached footage. Restore from exhibition-media-source.zip to re-render.
+motion-film/public/exhibition-20260923/

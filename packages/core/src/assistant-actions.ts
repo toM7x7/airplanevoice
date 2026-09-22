@@ -161,6 +161,10 @@ export function actionAchieved(a: AssistantAction, c: TrialContext): boolean {
     case "route":
       return c.flightInstruction === a.value;
     case "environment":
+      if(a.value.startsWith("recipe:")) {
+        const expected=changeEnvironment(DEFAULT_ENVIRONMENT,a.value);
+        return !!c.environment && Object.entries(expected).every(([k,v])=>c.environment?.[k as keyof typeof expected]===v);
+      }
       if(a.value.startsWith("name:"))return c.environment?.name===a.value.slice(5).trim();
       if(a.value.startsWith("buildingSound:"))return c.environment?.buildingSound===a.value.endsWith(":on");
       return (

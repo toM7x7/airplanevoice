@@ -2,7 +2,8 @@
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
-const out = "output/consult-fix";
+const out = "output/scenery-recipe-check";
+const base = process.env.TEST_URL || "http://127.0.0.1:8789/?shared=1";
 await fs.mkdir(out, { recursive: true });
 const browser = await chromium.launch({
   headless: true,
@@ -35,6 +36,7 @@ await context.route("**/api/ai/**", async (route) => {
   if (path === "ask") {
     asks++;
     const design = body.text.startsWith("【Jev機体案】");
+    if (!design) assert(body.text.startsWith("【景色案】"));
     reply = {
       id: body.id,
       text: design
@@ -54,7 +56,7 @@ await context.route("**/api/ai/**", async (route) => {
                 ...snapshot.creation.aircraft,
                 color: "#334455",
               })
-            : "city",
+            : "recipe:" + JSON.stringify({preset:"city",name:"巴里と東京の空",seed:19,density:0.7,heightM:65,streetWidthM:42,greenery:0.3,buildingSound:false}),
         },
       },
     };
@@ -76,7 +78,7 @@ await q.route("**/api/ai/**", (r) =>
 p.on("pageerror", (e) => errors.push(e.message));
 const state = () => p.evaluate(() => JSON.parse(window.render_game_to_text()));
 try {
-  await p.goto("http://127.0.0.1:8787/?shared=1");
+  await p.goto(base);
   await p.waitForFunction(
     () =>
       window.render_game_to_text &&
@@ -103,17 +105,19 @@ try {
       .getAttribute("aria-pressed"),
     "true",
   );
+  assert.equal(await panel.getByLabel("建物の高さ（m）", {exact:true}).inputValue(), "65");
+  assert.equal(await panel.getByLabel("景色の名前", {exact:true}).inputValue(), "巴里と東京の空");
   await panel.getByLabel("建物で音がこもる表現を試す").check();
   await p.screenshot({ path: out + "/environment.png" });
   await panel
     .getByRole("button", { name: "みんなの空に反映", exact: true })
     .click();
-  await q.goto("http://127.0.0.1:8787/?shared=1");
+  await q.goto(base);
   await q.waitForFunction(
     () =>
       window.render_game_to_text &&
       JSON.parse(window.render_game_to_text()).room.state?.environment?.name ===
-        "夕暮れの街",
+        "巴里と東京の空",
   );
   assert.equal(
     (await q.evaluate(() => JSON.parse(window.render_game_to_text()))).room

@@ -1,0 +1,8 @@
+import {AbsoluteFill, interpolate, staticFile, useCurrentFrame} from 'remotion';
+import {Video} from '@remotion/media';
+export const Frame:React.FC<{children:React.ReactNode}>=({children})=><AbsoluteFill style={{background:'#102e35',color:'#f7f3e8',fontFamily:'Yu Gothic, Meiryo, sans-serif'}}>{children}</AbsoluteFill>;
+export const Brand=({label}:{label:string})=><div style={{position:'absolute',top:42,left:66,right:66,display:'flex',justifyContent:'space-between',fontSize:25,letterSpacing:2,color:'#c1d4d1'}}><span>AIRPLANEVOICE</span><span>{label}</span></div>;
+export const Reveal:React.FC<{children:React.ReactNode}>=({children})=>{const f=useCurrentFrame();return <div style={{opacity:interpolate(f,[0,12],[0,1],{extrapolateRight:'clamp'}),transform:`translateY(${interpolate(f,[0,16],[14,0],{extrapolateRight:'clamp'})}px)`}}>{children}</div>};
+export const Film=({name,start=0,style={}}:{name:string;start?:number;style?:React.CSSProperties})=><Video src={staticFile(`exhibition-20260923/${name}.mp4`)} trimBefore={start} muted style={{width:'100%',height:'100%',objectFit:'contain',...style}}/>;
+export const Screen=({name,note}:{name:string;note:string})=><><div style={{position:'absolute',left:60,top:280,width:1300,height:731,borderRadius:16,overflow:'hidden',border:'1px solid #426269'}}><Film name={name}/></div><div style={{position:'absolute',bottom:23,left:66,fontSize:22,color:'#acc4c2'}}>{note}</div></>;
+export const Heading=({children}:{children:React.ReactNode})=><div style={{position:'absolute',left:66,top:112,fontSize:76,fontWeight:700,lineHeight:1.3}}><Reveal>{children}</Reveal></div>;

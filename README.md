@@ -1,8 +1,14 @@
 # 音航跡 / SOUND TRAIL
 
+## 展示・別PCへの引き継ぎ（2026-09-23）
+
+**[公開版を開く](https://airplanevoice.pages.dev/?shared=1)** / **[別PCのCodexで再開](HANDOFF.md)** / **[ロードマップ](ROADMAP.md)** / **[当日の運用](docs/exhibition-runbook.md)** / **[動画・印刷物](https://github.com/toM7x7/airplanevoice/releases)**
+
+現在のソースは `feat/exhibition-flight-studio`（[PR #1](https://github.com/toM7x7/airplanevoice/pull/1)、未マージ）です。以下の日付付き内容には過去時点の仕様も含むため、再開時はまずHANDOFFとROADMAPを参照してください。
+
 **2026-09-23: [共通の展示空間](https://airplanevoice.pages.dev/?shared=1) とクラウド格納庫に対応。** PCで保存した機体をQuestで呼び出して編集・飛行できます。部屋作成は不要、展示は継続運転します。既存の端末内機体を移す手順と制限は [クラウド格納庫](docs/cloud-exhibition-2026-09-23.md) を参照。
 
-**2026-09-22 公開更新：VRの編集・つかむ操作・AI入口を整理しました。** [新しい公開入口](https://airplanevoice.pages.dev/) / [今回の変更と実機確認項目](docs/xr-editing-rework.md)。機体とメニューを指でつかむ、編集しながらGPTライブ/Jevを使う、滑走路から出発する流れを追加。以下は各時点の開発記録です。
+**2026-09-22 公開更新：VRの編集・つかむ操作・AI入口を整理しました。** [新しい公開入口](https://airplanevoice.pages.dev/) / [今回の変更と実機確認項目](docs/xr-editing-rework.md)。機体とメニューを指でつかむ、編集しながらGPT-Live/Jevを使う、滑走路から出発する流れを追加。以下は各時点の開発記録です。
 **2026-09-22 ローカル更新：PC／VRで一機をつくる。** 形→音→名前→送り出すの4手順、模型、試聴、保存・部屋への受け渡し・VRでの呼び出しを追加。AI案内とボタンは共通の制作操作を使います。[今回の範囲とCloudflareの保存設計](docs/creation-experience.md) / [残工程](docs/local-completion-plan.md)。公開は追加指示まで保留。以下の日付付き記録は各時点の履歴です。
 
 ## 現在の共有版（2026-09-23）

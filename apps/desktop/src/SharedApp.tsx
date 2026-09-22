@@ -1856,7 +1856,7 @@ export function SharedApp() {
             set={setEnvironmentDraft}
             close={() => setEnvironmentOpen(false)}
             ready={enabled}
-            consult={async text => voiceControls?.askText ? voiceControls.askText(text) : "AIの準備中です。少し待ってからもう一度お試しください。"}
+            consult={async text => voiceControls?.askText ? voiceControls.askText(`【景色案】${text}`.slice(0,500)) : "AIの準備中です。少し待ってからもう一度お試しください。"}
             message={note}
             apply={() => {
               const id = client.send({

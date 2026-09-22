@@ -146,6 +146,7 @@ export function environmentObjects(input: EnvironmentRecipe) {
   return { buildings, trees };
 }
 export function changeEnvironment(source: EnvironmentRecipe, value: string) {
+  if (value.startsWith("recipe:")) return checkedEnvironment(JSON.parse(value.slice(7)));
   if (value in ENVIRONMENT_PRESETS)
     return {
       ...environmentPreset(value as EnvironmentRecipe["preset"]),

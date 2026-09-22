@@ -140,6 +140,7 @@ export function AiTrialPanel({
         const designDraft =
           r.command.action.control === "creation" &&
           r.command.action.value.startsWith("design:");
+        const sceneryDraft=r.command.action.control==="environment" && r.command.action.value.startsWith("recipe:");
         setCompact(!designDraft);
         let ok = false;
         try {
@@ -155,7 +156,7 @@ export function AiTrialPanel({
             { id: r.command.id, ok, context: context.current() },
           );
           completedText =
-            ok && designDraft ? `${r.text}\n${result.text}` : result.text;
+            ok && (designDraft||sceneryDraft) ? `${r.text}\n${result.text}` : result.text;
           if (!cancelled) setReply(completedText);
         } catch {
           completedText =

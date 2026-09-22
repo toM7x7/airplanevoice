@@ -1,4 +1,5 @@
 import {proposeDesign} from "./design-provider";
+import {proposeEnvironment} from "./environment-provider";
 import { DurableObject } from "cloudflare:workers";
 import { LiveTranscript } from "../packages/core/src/live-transcript";
 import {
@@ -336,6 +337,7 @@ export class AiTrial extends DurableObject<Env> {
     if (this.backendBusy)
       throw new AiError("前の相談への回答を待っています。", 429);
     const design=text.startsWith("【Jev機体案】");
+    const scenery=text.startsWith("【景色案】");
     if (!design && !this.env.OPENAI_API_KEY)
       throw new AiError("OpenAIのキーが未設定です。", 503);
     this.ctx.storage.sql.exec(
@@ -346,7 +348,7 @@ export class AiTrial extends DurableObject<Env> {
     this.write(s);
     this.backendBusy = true;
     try {
-      const reply = design ? await proposeDesign(this.env.TYPESAFE_API_KEY,text.slice(8),s.context!) : await answerTrial(
+      const reply = scenery ? await proposeEnvironment(this.env.OPENAI_API_KEY,text.slice(5),s.context!) : design ? await proposeDesign(this.env.TYPESAFE_API_KEY,text.slice(8),s.context!) : await answerTrial(
         this.env.OPENAI_API_KEY,
         text,
         s.context!,
@@ -356,6 +358,10 @@ export class AiTrial extends DurableObject<Env> {
         this.history,
       );
       if (this.read().owner === client) {
+        if(scenery && JSON.stringify(this.read().context?.environment)!==JSON.stringify(s.context?.environment)) {
+          reply.action=undefined;
+          reply.text="案を作っている間に景色が変わりました。今の編集を保っています。必要ならもう一度相談してください。";
+        }
         if(design && JSON.stringify(this.read().context?.creation)!==JSON.stringify(s.context?.creation)) {
           reply.action=undefined;
           reply.text="案を作っている間に機体が変わりました。今の編集は維持しています。必要ならもう一度相談してください。";
