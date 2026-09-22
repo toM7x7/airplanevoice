@@ -10,7 +10,7 @@
   position: fixed;
   top: 84px;
   right: 22px;
-  z-index: 30;
+  z-index: 60;
 }
 .av-ai[data-integrated="true"] .av-ai-panel {
   max-height: calc(100dvh - 180px);

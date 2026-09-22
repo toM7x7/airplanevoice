@@ -730,3 +730,4 @@ VRから第2/第3音色候補・比較・共有・Undoを除き、標準音の�
 - 最終ビルドで掴み5項目、関連27テストを再確認。公開Pagesでも5項目、最新アセット/AI準備設定を確認。AIはfixtureであり有料呼び出しなし。実Questと実音声会話の受入は別。
 - Worker7aa4e3bc-b735-4d26-8f0b-3a6835b76d18 / Pages5909e12e / bundle9247584f8d44f688。
 - 証拠 output/menu-voice-2026-09-23/{creation,grab,skill,public}。仕様 docs/menu-and-voice-2026-09-23.md。
+- 2026-09-23 機体案の部分採用・景色相談：Jevの質問別指示と部分採用を修正。景色パネルに文字入力・名前・任意の建物遮蔽音を追加。255テスト、型検査、ビルド、ローカル2端末UI、実WebAudio、公開AI2回を確認。公開の追加共有接続は4接続上限の429で未確認。詳細 docs/consultation-fix-2026-09-23.md。

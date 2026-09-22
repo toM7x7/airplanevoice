@@ -1,6 +1,6 @@
 import {
   designRequest,
-  designProposal,
+  evaluateDesignProposal,
 } from "../packages/core/src/design-assistant";
 import { DEFAULT_AIRCRAFT } from "../packages/core/src/workshop";
 import type { TrialContext, TrialReply } from "../packages/core/src/ai-trial";
@@ -20,10 +20,16 @@ export async function proposeDesign(
     designRequest(question, current),
     5000,
   );
-  const aircraft = designProposal(raw, current);
+  const result = evaluateDesignProposal(raw, current),
+    aircraft = result.aircraft;
+  if (result.reason === "invalid")
+    throw new AiError(
+      "Jevの応答形式を確認できませんでした。機体は変更していません。",
+      502,
+    );
   return aircraft
     ? {
-        text: "Jevが機体案を組みました。下書きで確認し、スライダーや『ひとつ戻す』で調整できます。",
+        text: `Jevの案：${result.applied.join("・")}を下書きに反映します。${result.uncertain.length ? result.uncertain.join("・") + "は候補が分かれたため、今の設定を保ちます。" : ""}保存や出発はご自身で選べます。`,
         guide: "none",
         revision: c.revision,
         action: {
@@ -33,7 +39,10 @@ export async function proposeDesign(
         },
       }
     : {
-        text: "機体案を絞れませんでした。双発か四発、色、長い翼など、重視する点を教えてください。",
+        text:
+          result.reason === "unchanged"
+            ? "今の機体を維持する案でした。変えたい点を、例えば『尾翼を紺色に、双発に』のように指定できます。"
+            : `${result.uncertain.join("・")}の候補が分かれました。ここは今の設定を保っています。変えたい形や色をもう少し指定するか、ボタンから選べます。`,
         guide: "none",
         revision: c.revision,
       };

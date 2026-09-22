@@ -795,3 +795,10 @@
 
 .environment-panel .wb-choices {display:grid;grid-template-columns:1fr 1fr;gap:4px;}
 .environment-panel .wb-choices [aria-pressed="true"] {background:#205963;color:white;}
+
+.environment-panel textarea {display:block;width:100%;box-sizing:border-box;min-height:82px;resize:vertical;font:inherit;padding:10px;border:1px solid #9aafac;border-radius:8px;background:white;color:#16383e;}
+.environment-consult {padding:0 10px 10px;border:1px solid #b8ceca;border-radius:12px;background:#eaf0eb;}
+.environment-panel .environment-sound {display:flex;align-items:center;gap:8px;font-size:13px;}
+.environment-panel .environment-sound input {width:auto;margin:0;}
+.environment-panel input:not([type="range"]):not([type="checkbox"]) {font:inherit;padding:9px 10px;border:1px solid #9aafac;border-radius:8px;box-sizing:border-box;}
+.av-workbench:has(.environment-panel) .av-ai[data-integrated="true"]:has(.av-ai-panel[data-compact="true"]) {left:24px;right:auto;top:auto;bottom:145px;max-width:calc(100vw - 48px);}

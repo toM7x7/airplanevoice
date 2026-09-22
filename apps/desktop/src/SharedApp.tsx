@@ -161,6 +161,9 @@ export function SharedApp() {
   }, [environmentOpen, room.state?.environment]);
   const sceneState = useSyncExternalStore(e.subscribe, () => e.snapshot);
   const vrState = useSyncExternalStore(vr.subscribe, () => vr.snapshot);
+  useEffect(()=>{
+    audio.setEnvironment(environmentOpen&&!vr.active?environmentDraft:room.state?.environment??DEFAULT_ENVIRONMENT,!(vr.active&&vrState.displayMode==="ar"));
+  },[audio,environmentOpen,environmentDraft,room.state?.environment,vr,vrState.status,vrState.displayMode]);
   useEffect(() => {
     if (creation.open && vrState.status === "presenting") vr.recallCreation();
   }, [creation.open, creation.entry.id, vrState.status, vr]);
@@ -899,6 +902,7 @@ export function SharedApp() {
           trace: e.soundTraceMode,
           levels: audio.levels,
           mixGains: audio.mixGains,
+          buildingSound: audio.buildingSoundState,
           buses: audio.busLevels,
           volume: audio.volumeLevel,
           state: audio.context?.state ?? "locked",
@@ -1852,7 +1856,7 @@ export function SharedApp() {
             set={setEnvironmentDraft}
             close={() => setEnvironmentOpen(false)}
             ready={enabled}
-            consult={() => voiceControls?.show?.()}
+            consult={async text => voiceControls?.askText ? voiceControls.askText(text) : "AIの準備中です。少し待ってからもう一度お試しください。"}
             message={note}
             apply={() => {
               const id = client.send({

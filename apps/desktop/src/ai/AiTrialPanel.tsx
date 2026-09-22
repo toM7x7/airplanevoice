@@ -29,6 +29,7 @@ export interface VoiceControls {
   observationNote?: string;
   toggleObservation?: () => void;
   show?: () => void;
+  askText?: (text: string) => Promise<string>;
 }
 
 function savedAccess() {
@@ -91,6 +92,8 @@ export function AiTrialPanel({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [question, setQuestion] = useState("");
+  const textInput = useRef<HTMLInputElement>(null);
+  const textBusy = useRef(false);
   const [reply, setReply] = useState("");
   const [check, setCheck] = useState("");
   const [voice, setVoice] = useState<LiveClientState>({
@@ -114,9 +117,9 @@ export function AiTrialPanel({
   const action = useRef(onAction);
   action.current = onAction;
   const seenReply = useRef("");
-  const consume = useRef<(reply: TrialReply & { id: string }) => Promise<void>>(
-    async () => {},
-  );
+  const consume = useRef<
+    (reply: TrialReply & { id: string }) => Promise<string>
+  >(async () => "");
   useEffect(() => {
     if (!access || !open || disabled || !audio.current) return;
     let cancelled = false;
@@ -129,11 +132,15 @@ export function AiTrialPanel({
     player.current = live;
     setVoice(live.state);
     consume.current = async (r) => {
-      if (cancelled || r.id === seenReply.current) return;
+      if (cancelled || r.id === seenReply.current) return r.text;
+      let completedText = r.text;
       seenReply.current = r.id;
       setReply(r.text);
       if (r.command) {
-        setCompact(true);
+        const designDraft =
+          r.command.action.control === "creation" &&
+          r.command.action.value.startsWith("design:");
+        setCompact(!designDraft);
         let ok = false;
         try {
           if (r.command.expiresAt >= Date.now() && action.current)
@@ -141,23 +148,25 @@ export function AiTrialPanel({
         } catch {
           /* Report failure without repeating the operation. */
         }
-        if (cancelled) return;
+        if (cancelled) return "操作の接続が終了しました。";
         try {
           const result = await client.request<{ text: string }>(
             "action-result",
             { id: r.command.id, ok, context: context.current() },
           );
-          if (!cancelled) setReply(result.text);
+          completedText =
+            ok && designDraft ? `${r.text}\n${result.text}` : result.text;
+          if (!cancelled) setReply(completedText);
         } catch {
-          if (!cancelled)
-            setError(
-              "画面の操作結果を通信で返せませんでした。操作は自動で繰り返しません。現在の設定を確認してください。",
-            );
+          completedText =
+            "画面の操作結果を通信で返せませんでした。操作は自動で繰り返しません。現在の設定を確認してください。";
+          if (!cancelled) setError(completedText);
         }
       } else {
         if (r.guide !== "none") setCompact(true);
         guide.current(r.guide);
       }
+      return completedText;
     };
     const sync = async () => {
       if (cancelled || sending) return;
@@ -242,6 +251,40 @@ export function AiTrialPanel({
       setBusy(false);
     }
   };
+  const askText = async (text: string): Promise<string> => {
+    if (textBusy.current || busy) return "前の相談への回答を待っています。";
+    if (!text.trim() || text.length > 500)
+      return "相談は1〜500文字で入力してください。";
+    textBusy.current = true;
+    setOpen(true);
+    setBusy(true);
+    setError("");
+    try {
+      for (let n = 0; n < 30 && !api.current; n++)
+        await new Promise((r) => setTimeout(r, 100));
+      const client = api.current;
+      if (!client)
+        throw new Error(
+          "AIに接続できません。AI案内の接続状態を確認してください。",
+        );
+      const status = await client.context(context.current());
+      if (!status.enabled) throw new Error("AI接続の準備ができていません。");
+      setStatus(status);
+      const response = await client.ask(text);
+      const latest=await client.status();
+      const result = latest.reply ? await consume.current(latest.reply) : response.text;
+      setStatus(latest);
+      return result;
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "相談に接続できませんでした。";
+      setError(message);
+      return message;
+    } finally {
+      textBusy.current = false;
+      setBusy(false);
+    }
+  };
   const ask = () =>
     void perform(async (client) => {
       await client.ask(question);
@@ -273,9 +316,14 @@ export function AiTrialPanel({
           : error || voice.message,
       authorized: !!access,
       prepared: open && !!api.current,
+      askText,
       show: () => {
         setOpen(true);
         setCompact(false);
+        setTimeout(() => {
+          textInput.current?.focus();
+          textInput.current?.scrollIntoView({ block: "nearest" });
+        }, 100);
       },
       prepare: () => {
         setOpen(true);
@@ -434,6 +482,56 @@ export function AiTrialPanel({
               </form>
             ) : (
               <>
+                <form
+                  className="av-ai-section"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    ask();
+                  }}
+                >
+                  <h3>文字でも相談</h3>
+                  <label>
+                    操作や飛行について
+                    <input
+                      ref={textInput}
+                      placeholder="例：細身の双発機で、尾翼を紺色に"
+                      maxLength={500}
+                      value={question}
+                      onChange={(e) => setQuestion(e.target.value)}
+                    />
+                  </label>
+                  <button
+                    type="submit"
+                    disabled={busy || !status?.enabled || !question.trim()}
+                  >
+                    相談する
+                  </button>
+                  <button
+                    type="button"
+                    disabled={
+                      busy ||
+                      !status?.enabled ||
+                      !status?.configured.typesafe ||
+                      !question.trim()
+                    }
+                    onClick={() =>
+                      void perform(async (c) => {
+                        await c.ask(`【Jev機体案】${question}`.slice(0, 500));
+                        setQuestion("");
+                        const s = await c.status();
+                        setStatus(s);
+                        if (s.reply) await consume.current(s.reply);
+                      })
+                    }
+                  >
+                    Jevで機体案を作る
+                  </button>
+                  {reply && (
+                    <p className="av-ai-reply" role="status">
+                      {reply}
+                    </p>
+                  )}
+                </form>
                 <div className="av-ai-section">
                   <h3>
                     空の注目点 <small>TypeSafe</small>
@@ -562,38 +660,7 @@ export function AiTrialPanel({
                     </details>
                   )}
                 </div>
-                <form
-                  className="av-ai-section"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    ask();
-                  }}
-                >
-                  <h3>文字でも相談</h3>
-                  <label>
-                    操作や飛行について
-                    <input
-                      placeholder="音量の上げ方を教えて"
-                      maxLength={500}
-                      value={question}
-                      onChange={(e) => setQuestion(e.target.value)}
-                    />
-                  </label>
-                  <button
-                    type="submit"
-                    disabled={busy || !status?.enabled || !question.trim()}
-                  >
-                    相談する
-                  </button>
-                  <button type="button" disabled={busy||!status?.enabled||!status?.configured.typesafe||!question.trim()} onClick={()=>void perform(async c=>{
-                    await c.ask(`【Jev機体案】${question}`.slice(0,500));setQuestion("");const s=await c.status();setStatus(s);if(s.reply)await consume.current(s.reply);
-                  })}>Jevで機体案を作る</button>
-                  {reply && (
-                    <p className="av-ai-reply" role="status">
-                      {reply}
-                    </p>
-                  )}
-                </form>
+
                 <details className="av-ai-details">
                   <summary>接続・利用履歴</summary>
                   <p>

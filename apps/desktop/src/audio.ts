@@ -1,3 +1,5 @@
+import {environmentObjects,type EnvironmentRecipe,type EnvironmentObject} from "../../../packages/core/src/environment";
+import {buildingSound} from "../../../packages/core/src/building-sound";
 import {
   DEFAULT_SOUND,
   type SoundDesign,
@@ -76,6 +78,16 @@ export class AircraftAudio {
     output: Level;
   } = { flights: {}, output: { rms: 0, peak: 0, db: -120 } };
   private buses = new Map<FlightId, GainNode>();
+  private soundBuildings:EnvironmentObject[]=[];
+  private environmentKey="";
+  buildingSoundState={enabled:false,buildings:0,blocked:0,lastStrength:0};
+  setEnvironment(recipe:EnvironmentRecipe,visible=true) {
+    const enabled=visible&&recipe.buildingSound===true;
+    const key=JSON.stringify([recipe.preset,recipe.seed,recipe.density,recipe.heightM,recipe.streetWidthM,recipe.greenery,enabled]);
+    if(key===this.environmentKey)return;this.environmentKey=key;
+    this.soundBuildings=enabled?environmentObjects(recipe).buildings:[];
+    this.buildingSoundState={enabled,buildings:this.soundBuildings.length,blocked:0,lastStrength:0};
+  }
   mixGains: Partial<Record<FlightId, number>> = { "ST-01": 1 };
   playedByFlight: Partial<Record<FlightId, number>> = {};
   private voices = new Set<{
@@ -330,15 +342,17 @@ export class AircraftAudio {
     source.playbackRate.value = arrival.pitchRatio;
     const filter = ctx.createBiquadFilter();
     filter.type = "lowpass";
-    filter.frequency.value = clamp(1900 - arrival.distanceM * 0.4, 450, 1800);
+    const obstruction=buildingSound(arrival.emission.position,{x:ctx.listener.positionX.value,y:ctx.listener.positionY.value,z:ctx.listener.positionZ.value},this.soundBuildings);
+    this.buildingSoundState.lastStrength=obstruction.strength;if(obstruction.strength>0)this.buildingSoundState.blocked++;
+    filter.frequency.value = Math.min(clamp(1900 - arrival.distanceM * 0.4, 450, 1800),obstruction.cutoffHz);
     const bass = ctx.createBiquadFilter();
     bass.type = "lowshelf";
     bass.frequency.value = 150;
     bass.gain.value = lowGain * 5;
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0, time);
-    gain.gain.linearRampToValueAtTime(0.4, time + 0.09);
-    gain.gain.setValueAtTime(0.4, time + 0.16);
+    gain.gain.linearRampToValueAtTime(0.4*obstruction.gain, time + 0.09);
+    gain.gain.setValueAtTime(0.4*obstruction.gain, time + 0.16);
     gain.gain.linearRampToValueAtTime(0, time + 0.34);
     const panner = ctx.createPanner();
     panner.panningModel = "HRTF";

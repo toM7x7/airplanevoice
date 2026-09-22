@@ -161,6 +161,8 @@ export function actionAchieved(a: AssistantAction, c: TrialContext): boolean {
     case "route":
       return c.flightInstruction === a.value;
     case "environment":
+      if(a.value.startsWith("name:"))return c.environment?.name===a.value.slice(5).trim();
+      if(a.value.startsWith("buildingSound:"))return c.environment?.buildingSound===a.value.endsWith(":on");
       return (
         !!c.environment &&
         (a.value in ENVIRONMENT_PRESETS
@@ -302,7 +304,7 @@ export function assistantMenu(c: TrialContext) {
             seed: "0〜9999整数",
           },
           instruction:
-            "environmentのvalueはpresetのキーまたはパラメーター名:数値。PCの下書きだけ変更。共有は利用者が画面で確定。",
+            "environmentのvalueはpresetのキーまたはパラメーター名:数値。name:任意の40字以内、buildingSound:on/offも可。PCの下書きだけ変更。共有は利用者が画面で確定。",
         }
       : undefined,
     pages: c.controls?.includes("menu")

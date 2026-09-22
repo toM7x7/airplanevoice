@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   ENVIRONMENT_PRESETS,
   type EnvironmentRecipe,
@@ -18,8 +19,11 @@ export function EnvironmentPanel({
   close: () => void;
   ready: boolean;
   message: string;
-  consult: () => void;
+  consult: (text: string) => Promise<string>;
 }) {
+  const [question, setQuestion] = useState(""),
+    [reply, setReply] = useState(""),
+    [busy, setBusy] = useState(false);
   return (
     <aside
       className="environment-panel"
@@ -31,13 +35,67 @@ export function EnvironmentPanel({
         <button onClick={close}>閉じる</button>
       </header>
       <p>この画面で景色を試し、「みんなの空に反映」でQuestにも届けます。</p>
+      <label>
+        景色の名前
+        <input
+          aria-label="景色の名前"
+          maxLength={40}
+          placeholder={ENVIRONMENT_PRESETS[value.preset].label}
+          value={value.name ?? ""}
+          onChange={(e) =>
+            set({
+              ...value,
+              name: e.target.value.trim() ? e.target.value : undefined,
+            })
+          }
+        />
+      </label>
+      <form
+        className="environment-consult"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (busy || !question.trim()) return;
+          setBusy(true);
+          setReply("AIに相談しています…");
+          try {
+            setReply(await consult(question.trim()));
+          } catch (error) {
+            setReply(
+              error instanceof Error
+                ? error.message
+                : "相談に接続できませんでした。",
+            );
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <label>
+          作りたい景色を文字で相談
+          <textarea
+            aria-label="作りたい景色を文字で相談"
+            maxLength={500}
+            placeholder="例：都市にして。建物は低めで、空が広く見える感じ"
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+          />
+        </label>
+        <button type="submit" disabled={busy || !question.trim()}>
+          {busy ? "相談中…" : "景色の案を相談する"}
+        </button>
+        {reply && <p role="status">{reply}</p>}
+      </form>
       <div className="wb-choices">
         {Object.entries(ENVIRONMENT_PRESETS).map(([id, p]) => (
           <button
             key={id}
             aria-pressed={value.preset === id}
             onClick={() =>
-              set(environmentPreset(id as EnvironmentRecipe["preset"]))
+              set({
+                ...environmentPreset(id as EnvironmentRecipe["preset"]),
+                name: value.name,
+                buildingSound: value.buildingSound,
+              })
             }
           >
             {p.label}
@@ -70,13 +128,20 @@ export function EnvironmentPanel({
           />
         </label>
       ))}
-      <button onClick={consult}>文字でAIに相談</button>
+      <label className="environment-sound">
+        <input
+          type="checkbox"
+          checked={value.buildingSound ?? false}
+          onChange={(e) => set({ ...value, buildingSound: e.target.checked })}
+        />{" "}
+        建物で音がこもる表現を試す
+      </label>
       <button className="primary" disabled={!ready} onClick={apply}>
         みんなの空に反映
       </button>
       <p role="status">{message}</p>
       <small>
-        建物は軽量な試作です。ARでは背景を隠し、現実の景色を使います。音の反射・遮音はまだ再現しません。
+        自分と音源の間に建物があると、音量と高音を少し抑える簡易表現です。反射・残響は含みません。ARでは仮想の建物とこの効果を隠します。
       </small>
     </aside>
   );

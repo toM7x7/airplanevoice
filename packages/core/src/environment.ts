@@ -37,6 +37,8 @@ export const ENVIRONMENT_PRESETS = {
 } as const;
 export interface EnvironmentRecipe {
   preset: keyof typeof ENVIRONMENT_PRESETS;
+  name?: string;
+  buildingSound?: boolean;
   seed: number;
   density: number;
   heightM: number;
@@ -60,6 +62,8 @@ export function checkedEnvironment(input: unknown): EnvironmentRecipe {
       (k) =>
         ![
           "preset",
+          "name",
+          "buildingSound",
           "seed",
           "density",
           "heightM",
@@ -69,6 +73,16 @@ export function checkedEnvironment(input: unknown): EnvironmentRecipe {
     )
   )
     throw new Error("景色の種類を確認してください。");
+  if (
+    r.name !== undefined &&
+    (typeof r.name !== "string" ||
+      !r.name.trim() ||
+      r.name.length > 40 ||
+      /[\u0000-\u001f]/.test(r.name))
+  )
+    throw new Error("景色の名前は1〜40文字で入力してください。");
+  if (r.buildingSound !== undefined && typeof r.buildingSound !== "boolean")
+    throw new Error("建物の音の設定を確認してください。");
   for (const [key, min, max] of [
     ["seed", 0, 9999],
     ["density", 0, 1],
@@ -133,7 +147,17 @@ export function environmentObjects(input: EnvironmentRecipe) {
 }
 export function changeEnvironment(source: EnvironmentRecipe, value: string) {
   if (value in ENVIRONMENT_PRESETS)
-    return environmentPreset(value as EnvironmentRecipe["preset"]);
+    return {
+      ...environmentPreset(value as EnvironmentRecipe["preset"]),
+      ...(source.name ? { name: source.name } : {}),
+      ...(source.buildingSound !== undefined
+        ? { buildingSound: source.buildingSound }
+        : {}),
+    };
+  if (value.startsWith("name:"))
+    return checkedEnvironment({ ...source, name: value.slice(5).trim() });
+  if (value === "buildingSound:on" || value === "buildingSound:off")
+    return { ...source, buildingSound: value.endsWith(":on") };
   const [key, raw] = value.split(":");
   if (
     !["seed", "density", "heightM", "streetWidthM", "greenery"].includes(key) ||

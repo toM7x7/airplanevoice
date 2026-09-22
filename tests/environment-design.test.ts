@@ -14,6 +14,8 @@ import {
 import {
   DESIGN_CHOICES,
   designProposal,
+  designRequest,
+  evaluateDesignProposal,
 } from "../packages/core/src/design-assistant";
 import { TYPESAFE_MODEL } from "../packages/core/src/ai-intent";
 import { parseWorkshop } from "../packages/core/src/workshop";
@@ -65,7 +67,7 @@ it("round trips richer aircraft and rejects invalid atomic designs without mutat
       .entry.recipe.aircraft,
   ).toEqual(c.entry.recipe.aircraft);
 });
-it("Jev chooses only declared design options and malformed or uncertain replies have no effect", () => {
+it("Jev applies confident fields independently and rejects malformed replies", () => {
   const current = newCreation("my-aircraft").entry.recipe.aircraft;
   const answers = Object.fromEntries(
     Object.entries(DESIGN_CHOICES).map(([name, criteria]) => [
@@ -87,12 +89,59 @@ it("Jev chooses only declared design options and malformed or uncertain replies 
     designProposal({ model: TYPESAFE_MODEL, answers }, current)?.bodyLengthM,
   ).toBe(55);
   answers.engines.confidence = 0.1;
+  answers.engines.choice = "four";
+  answers.engines.probabilities = { keep: 0, two: 0.4, four: 0.6 };
+  const partial = evaluateDesignProposal(
+    { model: TYPESAFE_MODEL, answers },
+    current,
+  );
+  expect(partial.reason).toBe("ready");
+  expect(partial.uncertain).toEqual(["エンジン数"]);
+  expect(partial.aircraft?.color).toBe(current.color);
   expect(
-    designProposal({ model: TYPESAFE_MODEL, answers }, current),
-  ).toBeNull();
+    designProposal({ model: TYPESAFE_MODEL, answers }, current)?.engineCount,
+  ).toBe(current.engineCount);
   answers.engines.confidence = 1;
   answers.engines.choice = "execute_code";
   expect(
     designProposal({ model: TYPESAFE_MODEL, answers }, current),
   ).toBeNull();
+});
+it("specifies each question explicitly rather than relying on invisible question IDs", () => {
+  const request = designRequest(
+    "尾翼を紺色に",
+    newCreation("a").entry.recipe.aircraft,
+  );
+  expect(
+    new Set(Object.values(request.questions).map((q) => q.instructions)).size,
+  ).toBe(5);
+  expect(request.questions.accent.instructions).toContain("尾翼の色");
+  expect(request.questions.engines.instructions).toContain("エンジン数");
+});
+it("shares scenery names and acoustic preference without changing deterministic geometry", () => {
+  const original = environmentPreset("city");
+  const named = changeEnvironment(
+    changeEnvironment(original, "name:夕暮れの街"),
+    "buildingSound:on",
+  );
+  expect(checkedEnvironment(named).name).toBe("夕暮れの街");
+  expect(environmentObjects(named)).toEqual(environmentObjects(original));
+  expect(changeEnvironment(named, "park").name).toBe("夕暮れの街");
+  expect(
+    changeRoom(
+      newRoom(1),
+      {
+        id: "named-world",
+        type: "environment",
+        environment: named,
+        revision: 0,
+      },
+      2,
+    ).environment,
+  ).toEqual(named);
+  for (const name of ["", "x".repeat(41), "a\nb"])
+    expect(() => checkedEnvironment({ ...original, name })).toThrow();
+  expect(() =>
+    checkedEnvironment({ ...original, buildingSound: "yes" }),
+  ).toThrow();
 });
