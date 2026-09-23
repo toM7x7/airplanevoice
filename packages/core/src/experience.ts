@@ -213,6 +213,7 @@ export class Experience {
     if (!this.canEdit) return;
     validateAircraft(design);
     this.compiledShow = null;
+    this.keepFocus();
     this.aircraftDesign = { ...design };
     this.log("aircraft_design", { ...design });
     this.notify();
@@ -240,7 +241,12 @@ export class Experience {
     );
   }
   get mixGains() {
-    return soundMix(this.flightIds, this.mixMode, this.focusId);
+    const ids = this.flightIds;
+    return soundMix(ids, this.mixMode, ids.includes(this.focusId) ? this.focusId : ids[0]);
+  }
+  /** Leaving a shared or composed sky can drop the focused slot (e.g. ST-02 of one remaining flight). */
+  private keepFocus() {
+    if (!this.flightIds.includes(this.focusId)) this.focusId = this.flightIds[0];
   }
   setAirspace(config: AirspaceConfig) {
     if (!this.canEdit) return;
@@ -273,6 +279,7 @@ export class Experience {
     // Compile first: errors preserve the last valid route and undo history.
     const compiled = compileRoute(spec);
     this.compiledShow = null;
+    this.keepFocus();
     if (remember) {
       this.history.push(structuredClone(this.spec));
       if (this.history.length > 30) this.history.shift();
