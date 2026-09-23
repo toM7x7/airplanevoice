@@ -74,6 +74,7 @@ export function buildAirspace(
   config: AirspaceConfig,
   delayScale: number,
   show?: CompiledShowFlight[],
+  reuse: readonly FlightPlan[] = [],
 ): FlightPlan[] {
   if (!validAirspace(config) || !Number.isFinite(startAtMs))
     throw new Error("Invalid airspace configuration");
@@ -103,6 +104,14 @@ export function buildAirspace(
     const flownRoute = planned?.route ?? translated;
     const start =
       startAtMs + (planned?.startSec ?? index * config.spacingSec) * 1000;
+    // A continuing shared flight keeps its plan; re-sampling long journeys stalls the frame.
+    const kept = reuse.find(
+      (p) =>
+        p.id === (planned?.id ?? aircraft.id) &&
+        p.startAtMs === start &&
+        p.route.checksum === flownRoute.checksum,
+    );
+    if (kept) return kept;
     return {
       id: planned?.id ?? aircraft.id,
       accent: aircraft.accent,

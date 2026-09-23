@@ -111,6 +111,8 @@ export class Experience {
   tower = new TowerDirector();
   aircraftDesign: AircraftDesign = { ...DEFAULT_AIRCRAFT };
   compiledShow: ReturnType<typeof compileShow> | null = null;
+  /** Plans the next start() may keep unchanged (shared sky reloads). */
+  reusablePlans: FlightPlan[] = [];
   get show() {
     return this.compiledShow?.recipe ?? null;
   }
@@ -350,7 +352,9 @@ export class Experience {
       this.airspace,
       delayScale,
       this.compiledShow?.flights,
+      this.reusablePlans,
     );
+    this.reusablePlans = [];
     this.tower.reset();
     this.fact({
       type: "scheduled",

@@ -6,6 +6,7 @@ import {
   trafficCapacity,
   trafficDecision,
   trafficGapMs,
+  automaticCruiseLaps,
   flightSlots,
   withFlightSlots,
   availableCruiseAltitude,
@@ -16,7 +17,7 @@ import { compileShow, type ShowRecipe } from "./show";
 import { recordTraffic, type TrafficHistoryEntry } from "./traffic";
 import { compileRoute } from "./route";
 import { withRunwayDeparture, DEPARTURE_MS } from "./departure";
-import { flightJourney, instructedRoute, ARRIVAL_MS, type FlightInstruction } from "./flight-journey";
+import { flightJourney, journeyChecksum, instructedRoute, ARRIVAL_MS, type FlightInstruction } from "./flight-journey";
 import { flightPose } from "./flight";
 import {checkedEnvironment,type EnvironmentRecipe} from "./environment";
 import { checkedVenue, type VenueMap } from "./venue";
@@ -198,7 +199,7 @@ export function changeRoom(
     flight.cruiseLaps = 2;
     const base = checkedWorkshop(entry.recipe).route;
     flight.journey = 2;
-    flight.checksum = flightJourney(base, 2).checksum;
+    flight.checksum = journeyChecksum(base, 2);
     flight.endsAt += DEPARTURE_MS + base.durationMs + ARRIVAL_MS;
     flight.clearAt += DEPARTURE_MS + base.durationMs + ARRIVAL_MS;
     reserveRunway(flight, launched.flights.filter(f=>f.id!==flight.id));
@@ -431,12 +432,15 @@ export function advanceExhibition(state: RoomState, now: number): RoomState {
     );
     const flight = next.flights.at(-1)!;
     const base = checkedWorkshop(recipe).route;
+    // One runway lands about one flight a minute; larger skies keep automatic flights aloft longer.
+    const laps = automaticCruiseLaps(trafficCapacity(state));
     flight.departure = true;
-    flight.cruiseLaps = 2;
+    flight.cruiseLaps = laps;
     flight.journey = 2;
-    flight.checksum = flightJourney(base, 2).checksum;
-    flight.endsAt += DEPARTURE_MS + base.durationMs + ARRIVAL_MS;
-    flight.clearAt += DEPARTURE_MS + base.durationMs + ARRIVAL_MS;
+    flight.checksum = journeyChecksum(base, laps);
+    const extra = DEPARTURE_MS + base.durationMs * (laps - 1) + ARRIVAL_MS;
+    flight.endsAt += extra;
+    flight.clearAt += extra;
     reserveRunway(flight, next.flights.filter(f=>f.id!==flight.id));
     flight.names = [entry?.name ?? "旅客機"];
     if (entry) flight.entryIds = [entry.id];
@@ -476,16 +480,17 @@ export function advanceExhibition(state: RoomState, now: number): RoomState {
 
 /** A single runway: new reservations move, existing departures and landings never do. */
 function reserveRunway(flight: SharedFlight, others: SharedFlight[]) {
-  const windows=(f:SharedFlight)=>[
+  // A landing reserves a following takeoff gap, so a busy arrival stream never blocks departures.
+  const windows=(f:SharedFlight,gap=0)=>[
     [f.startsAt,f.startsAt+15000],
-    ...(f.journey===2?[[f.endsAt-70000,f.endsAt-20000]]:[]),
+    ...(f.journey===2?[[f.endsAt-70000,f.endsAt-20000+gap]]:[]),
   ];
-  const occupied=others.flatMap(windows);
   for(const phase of [0,1]) for(let n=0;n<256;n++) {
     const a=windows(flight)[phase];if(!a) break;
+    const occupied=others.flatMap(f=>windows(f,phase?20000:0));
     const conflicts=occupied.filter(b=>a[0]<b[1]&&b[0]<a[1]);
     if(!conflicts.length) {
-      if(phase===1) {flight.checksum=sharedFlightRoute(flight).checksum;return;}
+      if(phase===1) {flight.checksum=flight.instructions?.length?sharedFlightRoute(flight).checksum:journeyChecksum(checkedWorkshop(flight.recipe).route,flight.cruiseLaps ?? 2,flight.landingDelayMs);return;}
       break;
     }
     const shift=Math.ceil(Math.max(...conflicts.map(b=>b[1]-a[0])))+1;

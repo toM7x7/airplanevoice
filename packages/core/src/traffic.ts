@@ -191,6 +191,9 @@ export function trafficDecision(
           : "混雑中は余韻を残して出発します",
   };
 }
+/** Participant flights keep 2 cruise laps; automatic flights fill 12+ aircraft skies by staying longer. */
+export const automaticCruiseLaps = (capacity: number) =>
+  capacity >= 24 ? 8 : capacity >= 18 ? 6 : capacity >= 12 ? 4 : 2;
 export const trafficGapMs = (decision: TrafficDecision) =>
   ({ flow: 15_000, spaced: 30_000, quiet: 45_000 })[decision.pace];
 

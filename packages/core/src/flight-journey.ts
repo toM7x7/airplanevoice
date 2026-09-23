@@ -30,6 +30,13 @@ function hermite(
       (t3 - t2) * seconds * vb[k];
   return p;
 }
+/** Same identity as flightJourney(...).checksum without sampling a long journey. */
+export const journeyChecksum = (
+  base: CompiledRoute,
+  laps = 2,
+  landingDelayMs = 0,
+) =>
+  `${base.checksum}/journey-v2/laps-${laps}${landingDelayMs ? `/hold-${landingDelayMs}` : ""}`;
 /** Versioned, deterministic animation. Old runway-v1 flights keep their old compiler. */
 export function flightJourney(
   base: CompiledRoute,
@@ -109,7 +116,7 @@ export function flightJourney(
     durationMs,
     totalLengthM: length,
     samples,
-    checksum: `${base.checksum}/journey-v2/laps-${laps}${landingDelayMs ? `/hold-${landingDelayMs}` : ""}`,
+    checksum: journeyChecksum(base, laps, landingDelayMs),
   };
 }
 /** Smooth, finite route detours; the original path before the command and after it stays unchanged. */

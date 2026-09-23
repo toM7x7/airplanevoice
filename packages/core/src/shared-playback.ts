@@ -8,6 +8,18 @@ import {
   type SharedFlight,
 } from "./shared-room";
 
+// Long automatic journeys are expensive to sample; reuse them across sky reloads by identity.
+const routes = new Map<string, ReturnType<typeof sharedFlightRoute>>();
+function cachedRoute(f: SharedFlight) {
+  let route = routes.get(f.checksum);
+  if (!route) {
+    route = sharedFlightRoute(f);
+    if (routes.size >= 64) routes.delete(routes.keys().next().value!);
+    routes.set(f.checksum, route);
+  }
+  return route;
+}
+
 /** Shared timestamps drive every aircraft and its independently delayed sound. */
 export class SharedPlayback {
   flightId: string | null = null;
@@ -91,7 +103,7 @@ export class SharedPlayback {
           sourceEntryId: f.entryIds?.[i],
         }));
       }
-      const route = sharedFlightRoute(f);
+      const route = cachedRoute(f);
       if (route.checksum !== f.checksum)
         throw new Error(
           "飛行エンジンの版が一致しません。ページを更新してください。",
@@ -140,6 +152,7 @@ export class SharedPlayback {
     e.airspace = { aircraftCount: entries.length, spacingSec: 0 };
     if (!e.flightIds.includes(e.focusId)) e.focusId = entries[0].id;
     e.nowMs = base - 2500;
+    e.reusablePlans = previous;
     e.start(1.6);
     e.flights = e.flights.map((f) => {
       const old = previous.find(
