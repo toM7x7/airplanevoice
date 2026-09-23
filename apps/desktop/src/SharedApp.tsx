@@ -206,6 +206,10 @@ export function SharedApp() {
     } else selectedIdentity.current = { id: selected, start: selectedStart };
   }, [selected, selectedStart]);
   const [resting, setResting] = useState(true);
+  const restingNow = useRef(resting);
+  restingNow.current = resting;
+  // Sound silenced by taking the headset off or switching users returns when the view does.
+  const resumeSound = useRef(false);
   const [volume, setVolume] = useState(35);
   const [note, setNote] = useState("");
   const [page, setPage] = useState<SharedPage>("main");
@@ -655,6 +659,7 @@ export function SharedApp() {
     }
   };
   const rest = () => {
+    resumeSound.current = false;
     speech.stop();
     setResting(true);
     audio.stop();
@@ -735,6 +740,18 @@ export function SharedApp() {
     view.current.pitch = Math.atan2(y, Math.hypot(x, z));
   };
   vr.onLocalRest = rest;
+  const suspendSound = () => {
+    const was = !restingNow.current || resumeSound.current;
+    rest();
+    resumeSound.current = was;
+  };
+  const resumeIfSuspended = () => {
+    if (!resumeSound.current || document.hidden) return;
+    resumeSound.current = false;
+    void listen();
+  };
+  vr.onLocalSuspend = suspendSound;
+  vr.onLocalResume = resumeIfSuspended;
   vr.onSelect = setSelected;
   vr.onClear = clear;
   vr.sharedPanel = sharedPanel({
@@ -818,11 +835,8 @@ export function SharedApp() {
       void client.openExhibition();
     const refresh = setInterval(() => repaint((n) => n + 1), 500);
     const hidden = () => {
-      if (document.hidden) {
-        speech.stop();
-        setResting(true);
-        audio.stop();
-      }
+      if (document.hidden) suspendSound();
+      else resumeIfSuspended();
     };
     document.addEventListener("visibilitychange", hidden);
     return () => {

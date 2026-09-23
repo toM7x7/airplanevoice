@@ -400,7 +400,7 @@ export function advanceExhibition(state: RoomState, now: number): RoomState {
       ...state.flights.map((f) => f.startsAt),
     );
     if (
-      occupied >= trafficCapacity(state) ||
+      occupied >= automaticCapacity(state) ||
       now < lastStart + trafficGapMs(decision)
     )
       return state;
@@ -478,24 +478,42 @@ export function advanceExhibition(state: RoomState, now: number): RoomState {
   );
 }
 
+/** Slots automatic flights leave open so a visitor's departure need not wait for a landing. */
+export const visitorReserve = (capacity: number) => (capacity >= 6 ? 2 : 1);
+const automaticCapacity = (state: RoomState) =>
+  trafficCapacity(state) - visitorReserve(trafficCapacity(state));
 /** A single runway: new reservations move, existing departures and landings never do. */
 function reserveRunway(flight: SharedFlight, others: SharedFlight[]) {
-  // A landing reserves a following takeoff gap, so a busy arrival stream never blocks departures.
-  const windows=(f:SharedFlight,gap=0)=>[
-    [f.startsAt,f.startsAt+15000],
-    ...(f.journey===2?[[f.endsAt-70000,f.endsAt-20000+gap]]:[]),
-  ];
-  for(const phase of [0,1]) for(let n=0;n<256;n++) {
-    const a=windows(flight)[phase];if(!a) break;
-    const occupied=others.flatMap(f=>windows(f,phase?20000:0));
+  // Landings touch down at x=-950 and roll out to the takeoff point at x=-200 (endsAt-35 s), then taxi off.
+  // A departure appears at that point and leaves it within 5 s, so it only waits while a landed
+  // aircraft is within ~50 m of it; landings keep 50 s apart plus a 20 s takeoff gap.
+  const takeoff=(f:SharedFlight)=>[f.startsAt,f.startsAt+15000];
+  const leavingPoint=(f:SharedFlight)=>[f.startsAt,f.startsAt+5000];
+  const atTakeoffPoint=(f:SharedFlight)=>f.journey===2?[[f.endsAt-42000,f.endsAt-27000]]:[];
+  const landing=(f:SharedFlight,gap=0)=>f.journey===2?[[f.endsAt-70000,f.endsAt-20000+gap]]:[];
+  const shiftPast=(a:number[],occupied:number[][])=>{
     const conflicts=occupied.filter(b=>a[0]<b[1]&&b[0]<a[1]);
-    if(!conflicts.length) {
-      if(phase===1) {flight.checksum=flight.instructions?.length?sharedFlightRoute(flight).checksum:journeyChecksum(checkedWorkshop(flight.recipe).route,flight.cruiseLaps ?? 2,flight.landingDelayMs);return;}
-      break;
+    return conflicts.length?Math.ceil(Math.max(...conflicts.map(b=>b[1]-a[0])))+1:0;
+  };
+  for(let n=0;n<256;n++) {
+    const shift=Math.max(
+      shiftPast(takeoff(flight),others.map(takeoff)),
+      shiftPast(leavingPoint(flight),others.flatMap(atTakeoffPoint)),
+    );
+    if(!shift) break;
+    flight.startsAt+=shift;flight.endsAt+=shift;flight.clearAt+=shift;
+  }
+  if(flight.journey!==2) return;
+  for(let n=0;n<256;n++) {
+    const shift=Math.max(
+      shiftPast(landing(flight)[0],others.flatMap(f=>landing(f,20000))),
+      shiftPast(atTakeoffPoint(flight)[0],others.map(leavingPoint)),
+    );
+    if(!shift) {
+      flight.checksum=flight.instructions?.length?sharedFlightRoute(flight).checksum:journeyChecksum(checkedWorkshop(flight.recipe).route,flight.cruiseLaps ?? 2,flight.landingDelayMs);
+      return;
     }
-    const shift=Math.ceil(Math.max(...conflicts.map(b=>b[1]-a[0])))+1;
-    if(phase===0) flight.startsAt+=shift;
-    else flight.landingDelayMs=(flight.landingDelayMs??0)+shift;
+    flight.landingDelayMs=(flight.landingDelayMs??0)+shift;
     flight.endsAt+=shift;flight.clearAt+=shift;
   }
   throw new Error("滑走路の予定が混み合っています。少し待ってから飛ばしてください。");
@@ -525,7 +543,7 @@ export function nextRoomAlarm(state: RoomState, now: number) {
       availableCruiseAltitude(state, state.draft.route.altitudeM, now) === null;
     const due = pending
       ? pending.startsAt
-      : occupied >= trafficCapacity(state) || noLane
+      : occupied >= automaticCapacity(state) || noLane
         ? Math.min(...active.map((f) => f.clearAt))
         : lastStart;
     return Math.min(state.expiresAt, Math.max(now + 1000, due));

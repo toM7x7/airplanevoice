@@ -5,6 +5,7 @@ import {
   newRoom,
   advanceExhibition,
   nextRoomAlarm,
+  visitorReserve,
 } from "../packages/core/src/shared-room";
 import { DEFAULT_WORKSHOP } from "../packages/core/src/workshop";
 import {
@@ -71,7 +72,7 @@ it.each([6, 9, 12])(
   },
   15000,
 ); // Simulates 55 authoritative alarms and late joins per capacity.
-it("overlaps at least six automatic aircraft instead of waiting for the whole sky to clear", () => {
+it("overlaps automatic aircraft up to the visitor reserve instead of waiting for the whole sky to clear", () => {
   let state = newCloudExhibition(1000),
     now = 1000,
     peak = 0;
@@ -80,7 +81,7 @@ it("overlaps at least six automatic aircraft instead of waiting for the whole sk
     state = advanceExhibition(state, now);
     peak = Math.max(peak, trafficFacts(state, now).airborne);
   }
-  expect(peak).toBe(6);
+  expect(peak).toBe(6 - visitorReserve(6));
 });
 it("allows a manual departure to replace the automatic reservation and keeps saved settings", () => {
   const s = newCloudExhibition(1000),
@@ -130,7 +131,8 @@ it("preserves remaining aircraft identity, sound queues and late-join poses when
 it("reduces capacity without deleting airborne aircraft or changing their routes", () => {
   let s = newCloudExhibition(1000),
     now = 1000;
-  while (trafficFacts(s, now).airborne < 6) {
+  // Default capacity 6 leaves two visitor slots, so automatic flights fill four.
+  while (trafficFacts(s, now).airborne < 6 - visitorReserve(6)) {
     now = nextRoomAlarm(s, now);
     s = advanceExhibition(s, now);
   }

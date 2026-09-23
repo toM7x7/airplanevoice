@@ -186,6 +186,10 @@ export class VrRuntime {
   onSelect = (_id: FlightId) => {};
   onClear = () => {};
   onLocalRest: (() => void) | null = null;
+  /** Headset removal or a user switch hides the session; the page decides whether sound comes back. */
+  onLocalSuspend: (() => void) | null = null;
+  onLocalResume: (() => void) | null = null;
+  private suspended = false;
   sharedPanel: SharedVrPanel | null = null;
   creationModel: {
     begin: (controller: THREE.Group, ray: THREE.Ray) => boolean;
@@ -668,8 +672,15 @@ export class VrRuntime {
     if (this.session?.visibilityState !== "visible") {
       this.handInput?.reset();
       this.surface?.setTouchCursors([]);
-      this.pause();
+      if (this.onLocalSuspend) {
+        this.onLocalSuspend();
+        this.audio.stop();
+      } else this.pause();
+      this.suspended = true;
       this.lastFrameAt = 0;
+    } else if (this.suspended) {
+      this.suspended = false;
+      this.onLocalResume?.();
     }
   };
   private referenceReset = () => {
