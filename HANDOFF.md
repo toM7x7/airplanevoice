@@ -8,7 +8,7 @@
 - ソース：https://github.com/toM7x7/airplanevoice
 - 最新開発ブランチ：`feat/exhibition-flight-studio`
 - 作業PR：https://github.com/toM7x7/airplanevoice/pull/1
-- [現在地とロードマップ](ROADMAP.md) / [当日の運用](docs/exhibition-runbook.md)
+- [現在地とロードマップ](ROADMAP.md) / [アイデア相談ブリーフ](docs/idea-discussion-brief-2026-09-26.md) / [当日の運用](docs/exhibition-runbook.md)
 - 動画・A4横の印刷物：[展示持ち込み版](https://github.com/toM7x7/airplanevoice/releases/tag/exhibition-2026-09-23)。`exhibition-kit.zip` に完成品と手順をまとめている。
 
 公開体験はCloudflareで動く。この開発PCを閉じても公開サービスは動く。`localhost` / `127.0.0.1` はその端末自身なので、別PCやQuestへそのまま引き継ぐURLではない。
