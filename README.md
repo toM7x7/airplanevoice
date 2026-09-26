@@ -4,6 +4,8 @@
 
 **[公開版を開く](https://airplanevoice.pages.dev/?shared=1)** / **[別PCのCodexで再開](HANDOFF.md)** / **[ロードマップ](ROADMAP.md)** / **[当日の運用](docs/exhibition-runbook.md)** / **[動画・印刷物](https://github.com/toM7x7/airplanevoice/releases)**
 
+外部の方との意見交換には、[外部共有用プロジェクト概要](docs/external-share-brief.md)を利用できます。
+
 現在のソースは `feat/exhibition-flight-studio`（[PR #1](https://github.com/toM7x7/airplanevoice/pull/1)、未マージ）です。以下の日付付き内容には過去時点の仕様も含むため、再開時はまずHANDOFFとROADMAPを参照してください。
 
 **2026-09-23: [共通の展示空間](https://airplanevoice.pages.dev/?shared=1) とクラウド格納庫に対応。** PCで保存した機体をQuestで呼び出して編集・飛行できます。部屋作成は不要、展示は継続運転します。既存の端末内機体を移す手順と制限は [クラウド格納庫](docs/cloud-exhibition-2026-09-23.md) を参照。
