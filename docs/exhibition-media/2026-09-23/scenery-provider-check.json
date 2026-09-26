@@ -1,0 +1,16 @@
+{
+  "requestCount": 1,
+  "elapsedMs": 4519,
+  "text": "景色案「パリと東京を融合した都市景観」：パリの街並みの落ち着いた密度感と東京の高層ビルの高さを融合した都市景観。建物は箱型で文化的様式や個別特徴はなく、街路幅はやや広めで緑は控えめ。高度な高層ビル密集表現は難しいが雰囲気の近似を目指した設計。",
+  "draft": {
+    "name": "パリと東京を融合した都市景観",
+    "preset": "city",
+    "seed": 7,
+    "density": 0.75,
+    "heightM": 70,
+    "streetWidthM": 54,
+    "greenery": 0.15,
+    "buildingSound": false
+  },
+  "sharedRoomWrites": 0
+}

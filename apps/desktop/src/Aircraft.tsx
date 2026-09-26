@@ -35,8 +35,8 @@ export function Aircraft({
   const shape = useMemo(
     () => ({
       body: fuselageGeometry(),
-      left: wingGeometry(-1),
-      right: wingGeometry(1),
+      left: wingGeometry(-1, "main", design.wingSweepDeg),
+      right: wingGeometry(1, "main", design.wingSweepDeg),
       tailLeft: wingGeometry(-1, "tail"),
       tailRight: wingGeometry(1, "tail"),
       fin: wingGeometry(1, "fin"),
@@ -51,7 +51,7 @@ export function Aircraft({
       pylon: new THREE.BoxGeometry(0.48, 1, 1),
       light: new THREE.SphereGeometry(0.25, 8, 6),
     }),
-    [],
+    [design.wingSweepDeg],
   );
   const materials = useMemo(
     () => ({
@@ -107,8 +107,10 @@ export function Aircraft({
     [],
   );
   useLayoutEffect(() => {
-    materials.tail.color.set(accent);
-  }, [materials, accent]);
+    materials.tail.color.set(design.color ?? accent);
+    materials.paint.color.set(design.bodyColor ?? "#eceeea");
+    materials.shell.color.set(design.bodyColor ?? "#e5e9e8");
+  }, [materials, accent, design.color, design.bodyColor]);
   useLayoutEffect(() => {
     const instances = [windows.current, ...engineParts.current];
     return () => instances.forEach((mesh) => mesh?.dispose());
@@ -117,10 +119,10 @@ export function Aircraft({
   useEffect(
     () => () => {
       Object.values(shape).forEach((g) => g.dispose());
-      Object.values(materials).forEach((m) => m.dispose());
     },
-    [shape, materials],
+    [shape],
   );
+  useEffect(()=>()=>Object.values(materials).forEach(m=>m.dispose()),[materials]);
   useLayoutEffect(() => {
     const dummy = new THREE.Object3D();
     [-1, 1].forEach((side, j) => {
@@ -135,7 +137,7 @@ export function Aircraft({
     });
     windows.current!.instanceMatrix.needsUpdate = true;
     windows.current!.computeBoundingSphere();
-  }, []);
+  }, [shape.window]);
   useFrame(({ camera, gl }) => {
     if (!root.current || !details.current) return;
     root.current.getWorldPosition(positions.plane);
@@ -153,12 +155,14 @@ export function Aircraft({
   });
   const lengthScale = design.bodyLengthM / 71,
     spanScale = design.wingSpanM / 64;
-  const engineScale = design.engineCount === 2 ? 1.17 : 1;
+  const engineScale = (design.engineCount === 2 ? 1.17 : 1)*(design.engineScale??1);
+  const bodyScale=(design.bodyWidthM??6.2)/6.2;
+  const sweepDelta=Math.tan((design.wingSweepDeg??30)*Math.PI/180)-Math.tan(Math.PI/6);
   useLayoutEffect(() => {
     const engines = [-1, 1].flatMap((side) =>
       (design.engineCount === 4 ? [13, 23] : [16]).map((x) => ({
         x: side * x * spanScale,
-        z: 1.5 - (x - 12) * 0.61 - 2,
+        z: 1.5 - (x - 12) * 0.61 - 2 - (x-4)*sweepDelta,
         wingY: -0.1 + (x - 12) * 0.085,
       })),
     );
@@ -184,10 +188,10 @@ export function Aircraft({
       mesh.instanceMatrix.needsUpdate = true;
       mesh.computeBoundingSphere();
     });
-  }, [design.engineCount, spanScale, engineScale]);
+  }, [design.engineCount, spanScale, engineScale,sweepDelta]);
   return (
     <group ref={root} scale={[1, 1, lengthScale]} dispose={null}>
-      <mesh geometry={shape.body} material={materials.paint} />
+      <mesh geometry={shape.body} material={materials.paint} scale={[bodyScale,bodyScale,1]} />
       <mesh
         geometry={shape.fairing}
         material={materials.shell}
@@ -202,7 +206,7 @@ export function Aircraft({
         )}
       </group>
       <mesh geometry={shape.fin} material={materials.tail} />
-      <mesh geometry={shape.cockpit} material={materials.glass} />
+      <mesh geometry={shape.cockpit} material={materials.glass} scale={[bodyScale,bodyScale,1]} />
       {(
         [
           [shape.pylon, materials.wing],
@@ -221,19 +225,22 @@ export function Aircraft({
           }}
         />
       ))}
-      <group ref={details}>
+      <group ref={details} scale={[bodyScale,bodyScale,1]}>
         <instancedMesh
           ref={windows}
           args={[shape.window, materials.windows, 52]}
         />
       </group>
       {[-1, 1].map((side) => (
+        <group key={side}>
+        {(design.wingletHeightM??0)>0 && <mesh material={materials.tail} position={[side*31.4*spanScale,2.53+(design.wingletHeightM??0)/2,-11.8-27.4*sweepDelta]} rotation={[.2,0,-side*.2]}><boxGeometry args={[.16,design.wingletHeightM,1.65]}/></mesh>}
         <mesh
           key={side}
           geometry={shape.light}
           material={side < 0 ? materials.red : materials.green}
-          position={[side * 31.6 * spanScale, 2.53, -11.8]}
+          position={[side * 31.6 * spanScale, 2.53, -11.8-27.6*sweepDelta]}
         />
+        </group>
       ))}
     </group>
   );

@@ -20,6 +20,9 @@
     "test:evolution": "node scripts/evolution-check.mjs",
     "test:offline": "node scripts/offline-check.mjs",
     "test:vr": "node scripts/vr-check.mjs",
+    "test:controls": "node scripts/control-components-check.mjs",
+    "test:hands": "node scripts/hand-controls-check.mjs",
+    "capture:motion": "node scripts/render-motion-films.mjs",
     "test:audio": "node scripts/audio-output-check.mjs",
     "test:trail": "node scripts/trail-visibility-check.mjs",
     "test:transfer": "node scripts/transfer-check.mjs",
@@ -29,9 +32,15 @@
     "dev:shared": "wrangler dev",
     "test:shared": "node scripts/shared-check.mjs",
     "test:spatial": "node scripts/spatial-check.mjs",
+    "test:operator": "node scripts/shared-operator-check.mjs",
     "test:tower": "node scripts/tower-check.mjs",
     "test:exhibition": "node scripts/exhibition-check.mjs && node scripts/exhibition-alarm-check.mjs",
-    "deploy:shared": "npm run check:worker && npm run build && wrangler deploy"
+    "deploy:shared": "npm run check:worker && npm run build && wrangler deploy",
+    "render:motion": "node scripts/render-motion-films.mjs",
+    "test:motion": "node scripts/motion-browser-check.mjs",
+    "test:motion-films": "node scripts/check-motion-films.mjs",
+    "probe:typesafe": "node scripts/typesafe-probe.mjs",
+    "capture:motion:legacy": "node scripts/motion-review.mjs"
   },
   "dependencies": {
     "@react-three/fiber": "^9.7.0",

@@ -38,7 +38,7 @@ export function VenuePanel({
   return (
     <details className="venue-panel">
       <summary>机の位置合わせ・会場マップ</summary>
-      <p>Quest 3＋Quest 2で、同じ机を基準にします。最初は仮の3地点です。</p>
+      <p>PCで運営し、来場者はQuest 3で体験します。最初は仮の3地点です。</p>
       <svg viewBox="0 0 320 310" role="img" aria-label="会場の地点配置図">
         <rect width="320" height="310" rx="12" fill="#12353a" />
         <path d="M20 155H300M160 25V290" stroke="#476769" />
@@ -102,13 +102,14 @@ export function VenuePanel({
       </div>
       <p>
         小さな地図は目の前の配置図です。実寸表示は登録した距離で重ねます。
-        ARで現地に合わせるには、各Questで机の位置合わせを行ってください。
+        ARで現地に合わせるには、運営者がQuestを装着して机の枠を配置してください。
         地図を縮めても飛行と音は変わりません。会場図の画像はまだ未登録です。
       </p>
       <p role="status">{vr.snapshot.calibrationMessage}</p>
       <p>
-        机にA・Bを{Math.round(venue.baselineM * 100)}{" "}
-        cm間隔で置きます。CはAから奥へ同じ距離。Quest内の「見え方・操作案内」→「机と会場」から合わせます。
+        Quest内の「見え方・操作案内」→「机と会場」→「机の枠を目の前へ」。
+        A・Bが手前、C・Dが奥です。前後・左右・高さ・向きを調整し「この位置で使う」で確定します。
+        指で操作できます。詳細なA・B・C測定はコントローラーを使う追加確認です。
       </p>
       <p>
         地点の配置・選択を共有します。表示の切り替えは自分だけです。ブース間の飛行は準備中です。
@@ -160,6 +161,21 @@ export function VenuePanel({
                 value={Number.isFinite(draft.baselineM) ? draft.baselineM : ""}
                 onChange={(e) =>
                   setDraft({ ...draft, baselineM: e.target.valueAsNumber })
+                }
+              />
+            </label>
+            <label>
+              AとCの間隔（奥行き）
+              <input
+                aria-label="机の奥行き"
+                type="number"
+                min="0.3"
+                max="2"
+                step="0.01"
+                required
+                value={draft.tableDepthM ?? draft.baselineM}
+                onChange={(e) =>
+                  setDraft({ ...draft, tableDepthM: e.target.valueAsNumber })
                 }
               />
             </label>

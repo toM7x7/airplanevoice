@@ -1,4 +1,4 @@
-import { AIRCRAFT, type FlightId } from "./airspace";
+import { AIRCRAFT, MAX_AIRCRAFT, type FlightId } from "./airspace";
 import { compileRoute } from "./route";
 import { checksum, distance } from "./math";
 import {
@@ -33,9 +33,9 @@ export function compileShow(input: unknown) {
     s.title.length > 48 ||
     !Array.isArray(s.flights) ||
     s.flights.length < 1 ||
-    s.flights.length > 3
+    s.flights.length > MAX_AIRCRAFT
   )
-    throw new Error("演目名と1〜3機の予定を確認してください。");
+    throw new Error(`名前と1〜${MAX_AIRCRAFT}機の予定を確認してください。`);
   const flights: CompiledShowFlight[] = s.flights.map((f, i) => {
     if (
       !f ||
@@ -80,6 +80,9 @@ export const AIRCRAFT_PATTERNS = [
     name: "大きな四発",
     aircraft: { bodyLengthM: 82, wingSpanM: 78, engineCount: 4 as const },
   },
+  {name:"すらりとした双発",aircraft:{bodyLengthM:55,wingSpanM:48,engineCount:2 as const,bodyWidthM:4.8,wingSweepDeg:24,wingletHeightM:2.4}},
+  {name:"厚い胴体の双発",aircraft:{bodyLengthM:72,wingSpanM:78,engineCount:2 as const,bodyWidthM:7.2,wingSweepDeg:34,engineScale:1.18}},
+  {name:"伸びやかな翼端",aircraft:{bodyLengthM:67,wingSpanM:76,engineCount:2 as const,bodyWidthM:6,wingSweepDeg:30,wingletHeightM:3}},
 ];
 export const ROUTE_PATTERNS = [
   {

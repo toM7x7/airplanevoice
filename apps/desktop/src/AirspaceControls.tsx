@@ -12,7 +12,11 @@ export function AirspaceControls({
         <h2>空のにぎわい</h2>
         <span>LOCAL SKY</span>
       </div>
-      <div className="segmented" aria-label="飛ばす機数">
+      <div
+        className="segmented"
+        aria-label="飛ばす機数"
+        data-ai-control="fleet"
+      >
         {([1, 2, 3] as const).map((n) => (
           <button
             key={n}
@@ -46,7 +50,11 @@ export function AirspaceControls({
               </select>
             </label>
           )}
-          <div className="segmented listening-mode" aria-label="聴き方">
+          <div
+            className="segmented listening-mode"
+            aria-label="聴き方"
+            data-ai-control="mix"
+          >
             <button
               aria-pressed={mixMode === "focus"}
               onClick={() => e.setMix("focus")}

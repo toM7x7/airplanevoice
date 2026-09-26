@@ -5,6 +5,10 @@
   "main": "workers/room-worker.ts",
   "compatibility_date": "2026-09-16",
   "workers_dev": true,
+  "vars": { "AI_PUBLIC_DEMO": "true" },
+  "secrets": {
+    "required": ["OPENAI_API_KEY", "TYPESAFE_API_KEY", "AI_TRIAL_TOKEN"],
+  },
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
@@ -14,10 +18,12 @@
     "bindings": [
       { "name": "ROOMS", "class_name": "SkyRoom" },
       { "name": "DIRECTORY", "class_name": "RoomDirectory" },
+      { "name": "AI_TRIAL", "class_name": "AiTrial" },
     ],
   },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["SkyRoom", "RoomDirectory"] },
+    { "tag": "v2", "new_sqlite_classes": ["AiTrial"] },
   ],
   "observability": { "enabled": false },
   "dev": { "port": 8787, "ip": "127.0.0.1" },

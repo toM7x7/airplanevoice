@@ -149,7 +149,7 @@ try {
   }
   socket.close();
   socket = null;
-  ok("Server rejects all visitor mutations even through a direct WebSocket");
+  ok("Server rejects visitor changes to operator settings through a direct WebSocket");
 
   await b.locator("#vr-enter").click();
   await wait(b, () => JSON.parse(window.render_game_to_text()).vr.frames > 10);
@@ -171,10 +171,12 @@ try {
     );
   };
   const button = async (column, row) => {
-    const { panel, origin } = (await state(b)).vr,
+    await wait(b, () => JSON.parse(window.render_game_to_text()).vr.controls.progress === 1);
+    const { panel, origin, controls } = (await state(b)).vr,
       m = panel.matrix;
-    const x = ((30 + column * 497 + 230) / 1024 - 0.5) * panel.width;
-    const y = (0.5 - (157 + row * 81 + 34) / 512) * panel.height;
+    const hit = controls.targets.filter(t=>t.id.startsWith("action:"))[row*2+column];
+    const x = ((hit.x+hit.w/2) / 1024 - 0.5) * panel.width;
+    const y = (0.5 - (hit.y+hit.h/2) / 512) * panel.height;
     const target = [
       m[0] * x + m[4] * y + m[12],
       m[1] * x + m[5] * y + m[13],
@@ -202,7 +204,7 @@ try {
     );
     await frames();
   };
-  await button(0, 2); // View/help.
+  await button(0, 3); // View/help.
   await b.screenshot({ path: `${out}/02-vr-guide.png` });
   const before = await state(b);
   await button(0, 0); // AR.
@@ -288,7 +290,8 @@ try {
   assert.equal((await state(b)).vr.sessionMode, "immersive-vr");
   assert.equal((await state(b)).vr.canShowAR, false);
   assert.equal((await state(b)).audio.state, "running");
-  await button(1, 2);
+  await button(0, 3); // View/help.
+  await button(0, 3); // Exit from view/help.
   await wait(
     b,
     () => JSON.parse(window.render_game_to_text()).vr.status === "ready",

@@ -40,7 +40,7 @@ describe("exhibition flight authority", () => {
   it("starts only one flight and repeated alarms cannot duplicate an active flight", () => {
     const state = start();
     expect(state.flights).toHaveLength(1);
-    expect(state.flights[0].startsAt).toBe(now + 2500);
+    expect(state.flights[0].startsAt).toBe(now + 15000);
     expect(advanceExhibition(state, now)).toBe(state);
     expect(advanceExhibition(state, state.flights[0].clearAt - 1)).toBe(state);
     expect(nextRoomAlarm(state, now)).toBe(state.flights[0].clearAt);
@@ -58,7 +58,7 @@ describe("exhibition flight authority", () => {
     const late = state.flights[0].clearAt + 300000;
     const next = advanceExhibition(edited, late);
     expect(next.flights).toHaveLength(1);
-    expect(next.flights[0].startsAt).toBe(late + 2500);
+    expect(next.flights[0].startsAt).toBe(late + 15000);
     expect(next.flights[0].recipe).toEqual(recipe);
     expect(advanceExhibition(next, late)).toBe(next);
   });

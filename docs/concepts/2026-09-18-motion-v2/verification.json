@@ -1,0 +1,59 @@
+{
+  "checks": [
+    {
+      "id": "pc-lift",
+      "videoFrames": 540,
+      "fps": 60,
+      "videoDuration": 9,
+      "openingPanelFramesChecked": 97,
+      "uniqueOpeningPanelFrames": 97,
+      "audio": true
+    },
+    {
+      "id": "pc-trail",
+      "videoFrames": 540,
+      "fps": 60,
+      "videoDuration": 9,
+      "openingPanelFramesChecked": 97,
+      "uniqueOpeningPanelFrames": 97,
+      "audio": true
+    },
+    {
+      "id": "pc-ripple",
+      "videoFrames": 540,
+      "fps": 60,
+      "videoDuration": 9,
+      "openingPanelFramesChecked": 97,
+      "uniqueOpeningPanelFrames": 97,
+      "audio": true
+    },
+    {
+      "id": "vr-lift",
+      "videoFrames": 540,
+      "fps": 60,
+      "videoDuration": 9,
+      "openingPanelFramesChecked": 97,
+      "uniqueOpeningPanelFrames": 97,
+      "audio": true
+    },
+    {
+      "id": "vr-trail",
+      "videoFrames": 540,
+      "fps": 60,
+      "videoDuration": 9,
+      "openingPanelFramesChecked": 97,
+      "uniqueOpeningPanelFrames": 97,
+      "audio": true
+    },
+    {
+      "id": "vr-ripple",
+      "videoFrames": 540,
+      "fps": 60,
+      "videoDuration": 9,
+      "openingPanelFramesChecked": 97,
+      "uniqueOpeningPanelFrames": 97,
+      "audio": true
+    }
+  ],
+  "scope": "File cadence and changing panel pixels verified. These are not hardware performance or perceived-comfort measurements."
+}

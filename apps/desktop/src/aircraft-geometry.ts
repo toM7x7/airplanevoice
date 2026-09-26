@@ -134,6 +134,7 @@ const FIN = [
 export function wingGeometry(
   side: number,
   kind: "main" | "tail" | "fin" = "main",
+  sweepDeg = 30,
 ) {
   const stations = kind === "main" ? MAIN_WING : kind === "tail" ? TAIL : FIN;
   return loft(
@@ -157,7 +158,7 @@ export function wingGeometry(
           (kind === "fin" ? 0 : Math.sin(u * Math.PI) * chord * 0.012);
         return kind === "fin"
           ? new THREE.Vector3(cross, span, leading - chord * u)
-          : new THREE.Vector3(side * span, rise + cross, leading - chord * u);
+          : new THREE.Vector3(side * span, rise + cross, leading - chord * u - (kind === "main" ? Math.max(0,span-4)*(Math.tan(sweepDeg*Math.PI/180)-Math.tan(Math.PI/6)) : 0));
       }),
     ),
   );
@@ -220,28 +221,50 @@ export function spinnerGeometry() {
     20,
   );
 }
+/** Forward-facing windshield panes, defined in front elevation rather than a roof ring. */
 export function cockpitGeometry() {
   const vertices: number[] = [],
-    indices: number[] = [],
-    angles = [0.53, 1.08, 1.57, 2.06, 2.61];
-  for (let i = 0; i < angles.length - 1; i++) {
-    const a = angles[i] + 0.025,
-      b = angles[i + 1] - 0.025,
-      start = vertices.length / 3;
-    for (const z of [28.8, 30.65])
-      for (let j = 0; j <= 4; j++)
-        vertices.push(
-          ...bodySurface(z, a + ((b - a) * j) / 4, 0.035).toArray(),
-        );
-    for (let j = 0; j < 4; j++)
-      indices.push(
-        start + j,
-        start + j + 5,
-        start + j + 1,
-        start + j + 1,
-        start + j + 5,
-        start + j + 6,
-      );
+    indices: number[] = [];
+  const front = (x: number, y: number) => {
+    let lo = 24,
+      hi = 35.49;
+    for (let i = 0; i < 30; i++) {
+      const z = (lo + hi) / 2;
+      const width = sectionAt(z)[0];
+      const surfaceY =
+        Math.abs(x) >= width ? -100 : bodySurface(z, Math.acos(x / width)).y;
+      if (surfaceY > y) lo = z;
+      else hi = z;
+    }
+    return new THREE.Vector3(x, y, (lo + hi) / 2 + 0.065);
+  };
+  for (const side of [-1, 1]) {
+    // Central windshield, quarter pane, and side pane. Painted gaps form the pillars.
+    for (const [x0, x1, bottom0, bottom1, top0, top1] of [
+      [0.09, 1.18, 1.28, 1.24, 2.32, 2.22],
+      [1.28, 1.94, 1.24, 1.14, 2.2, 1.98],
+      [2.04, 2.43, 1.14, 1.04, 1.94, 1.64],
+    ]) {
+      const start = vertices.length / 3,
+        steps = 6;
+      for (let row = 0; row <= steps; row++)
+        for (let col = 0; col <= steps; col++) {
+          const u = col / steps,
+            v = row / steps;
+          const x = x0 + (x1 - x0) * u;
+          const bottom = bottom0 + (bottom1 - bottom0) * u,
+            top = top0 + (top1 - top0) * u;
+          vertices.push(
+            ...front(side * x, bottom + (top - bottom) * v).toArray(),
+          );
+        }
+      for (let row = 0; row < steps; row++)
+        for (let col = 0; col < steps; col++) {
+          const a = start + row * (steps + 1) + col,
+            b = a + steps + 1;
+          indices.push(a, b, a + 1, a + 1, b, b + 1);
+        }
+    }
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));

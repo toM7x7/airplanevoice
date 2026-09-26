@@ -1,0 +1,113 @@
+{
+  "results": [
+    {
+      "seconds": 60,
+      "metadata": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_type": "video",
+            "width": 1920,
+            "height": 1080,
+            "avg_frame_rate": "30/1",
+            "duration": "60.000000",
+            "nb_read_frames": "1800",
+            "side_data_list": [
+              {}
+            ]
+          },
+          {
+            "codec_type": "audio",
+            "avg_frame_rate": "0/0",
+            "duration": "60.053333",
+            "nb_read_frames": "2815"
+          }
+        ]
+      },
+      "audio": {
+        "peak": 0.30023193359375,
+        "rms": 0.041438940703999054
+      }
+    },
+    {
+      "seconds": 30,
+      "metadata": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_type": "video",
+            "width": 1920,
+            "height": 1080,
+            "avg_frame_rate": "30/1",
+            "duration": "30.000000",
+            "nb_read_frames": "900",
+            "side_data_list": [
+              {}
+            ]
+          },
+          {
+            "codec_type": "audio",
+            "avg_frame_rate": "0/0",
+            "duration": "30.058667",
+            "nb_read_frames": "1409"
+          }
+        ]
+      },
+      "audio": {
+        "peak": 0.199981689453125,
+        "rms": 0.04131030583142328
+      }
+    }
+  ],
+  "timing": [
+    {
+      "source": "create",
+      "frames": 280,
+      "observedFps": 29.63356346255975,
+      "p95GapMs": 34.000000000000696
+    },
+    {
+      "source": "ai",
+      "frames": 179,
+      "observedFps": 29.915966386554622,
+      "p95GapMs": 34.000000000000256
+    },
+    {
+      "source": "scenery",
+      "frames": 162,
+      "observedFps": 29.914529914529915,
+      "p95GapMs": 34.000000000000696
+    },
+    {
+      "source": "radar",
+      "frames": 177,
+      "observedFps": 30.029005289199798,
+      "p95GapMs": 34.000000000000256
+    },
+    {
+      "source": "flight",
+      "frames": 903,
+      "observedFps": 29.869527783296906,
+      "p95GapMs": 36.99999999999992
+    }
+  ],
+  "motion": [
+    {
+      "scene": "flight",
+      "frames": 60,
+      "changed": 59
+    },
+    {
+      "scene": "quest",
+      "frames": 60,
+      "changed": 59
+    }
+  ],
+  "notes": [
+    "AI response is a labelled fixture; no AI voice is recorded",
+    "Quest footage was recorded 2026-09-22; its UI is older",
+    "Audio is edited from current PC app recording; not a physical Quest recording"
+  ]
+}

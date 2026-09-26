@@ -1,0 +1,9 @@
+# サークルカット / 2026-09-22
+
+制作方法：組み込み image_gen。実画面ではなく宣伝用コンセプトアート。1:1 PNG。
+
+成果物：`output/pv-20260922/airplanevoice-circle-cut.png`。
+
+## 使用プロンプト
+
+Create one finished square 1:1 promotional circle-cut thumbnail, 1024x1024 or larger square, for the independent Japanese WebXR aircraft-and-spatial-audio creative experience AIRPLANEVOICE. Use case ads-marketing; polished illustration, not an app screenshot, not a photo, no UI mockup. Core feeling: gazing up in wonder at a beautiful passenger airliner and listening to its sound. One elegant white four-engine passenger airliner viewed from below at a gentle diagonal, complete silhouette clearly readable with broad wings and natural aircraft proportions, warm sunlight gleaming along the fuselage. Restrained editorial travel-poster illustration with clean confident shapes, soft atmospheric sky blue transitioning into rich dark teal and warm ivory; two or three extremely subtle warm-gold acoustic wave arcs flowing behind the airplane, not busy sci-fi effects. Luxurious airy composition, strong contrast, generous negative space, highly readable as a small exhibition catalog thumbnail. Exact typography: AIRPLANEVOICE in bold clean uppercase sans serif, prominent and fully spelled correctly across upper area with comfortable margins. Japanese tagline exactly 「見上げた空に、あなたの一機。」 below the title in smaller but very readable type, without quotation brackets. Bottom small text exactly 「VR / AR × AI」. No other text, no event/date, no invented booth or circle number, no third-party logos, no people, no headset, no weapon or fighter styling. Keep all key text and airplane within an 8% safe margin; square canvas, NOT a circular crop. This is conceptual promotional art reflecting the project's quiet sense of wonder, with sound and aircraft as the heroes.

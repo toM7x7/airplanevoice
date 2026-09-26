@@ -1,9 +1,17 @@
+import { checkedSound, type SoundDesign } from "./sound-design";
 import type { RouteSpec, Vec3 } from "./types";
 
 export interface AircraftDesign {
   bodyLengthM: number;
   wingSpanM: number;
   engineCount: 2 | 4;
+  sound?: SoundDesign;
+  color?: string;
+  bodyColor?: string;
+  bodyWidthM?: number;
+  wingSweepDeg?: number;
+  engineScale?: number;
+  wingletHeightM?: number;
 }
 export interface FlightSettings {
   speedMps: number;
@@ -74,9 +82,35 @@ function range(
 export function validateAircraft(
   value: unknown,
 ): asserts value is AircraftDesign {
-  keys(value, ["bodyLengthM", "wingSpanM", "engineCount"], "機体");
+  const withSound =
+    !!value && typeof value === "object" && Object.hasOwn(value, "sound");
+  const withColor =
+    !!value && typeof value === "object" && Object.hasOwn(value, "color");
+  keys(
+    value,
+    [
+      "bodyLengthM",
+      "wingSpanM",
+      "engineCount",
+      ...(withSound ? ["sound"] : []),
+      ...(withColor ? ["color"] : []),
+      ...["bodyColor","bodyWidthM","wingSweepDeg","engineScale","wingletHeightM"].filter(k=>!!value && typeof value === "object" && Object.hasOwn(value,k)),
+    ],
+    "機体",
+  );
+  if (withSound) checkedSound(value.sound);
+  if (
+    withColor &&
+    (typeof value.color !== "string" || !/^#[0-9a-fA-F]{6}$/.test(value.color))
+  )
+    throw new Error("機体の色は6桁の色番号で指定してください。");
   range(value.bodyLengthM, 50, 85, "胴体の長さ");
   range(value.wingSpanM, 45, 85, "翼の幅");
+  if(value.bodyColor !== undefined && (typeof value.bodyColor !== "string" || !/^#[0-9a-fA-F]{6}$/.test(value.bodyColor))) throw new Error("胴体の色は6桁の色番号で指定してください。");
+  if(value.bodyWidthM !== undefined) range(value.bodyWidthM,4.5,8,"胴体の太さ");
+  if(value.wingSweepDeg !== undefined) range(value.wingSweepDeg,20,38,"翼の後退角");
+  if(value.engineScale !== undefined) range(value.engineScale,.8,1.3,"エンジンの大きさ");
+  if(value.wingletHeightM !== undefined) range(value.wingletHeightM,0,3,"翼端の高さ");
   if (value.engineCount !== 2 && value.engineCount !== 4)
     throw new Error("エンジンは2基または4基です。");
 }

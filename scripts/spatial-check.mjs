@@ -55,10 +55,17 @@ async function trigger(p) {
 }
 async function button(p, col, row) {
   await p.bringToFront();
-  const { panel, origin, yaw } = (await state(p)).vr,
+  await wait(
+    p,
+    () => JSON.parse(window.render_game_to_text()).vr.controls.progress === 1,
+  );
+  const { panel, origin, yaw, controls } = (await state(p)).vr,
     m = panel.matrix;
-  const x = ((30 + col * 497 + 230) / 1024 - 0.5) * panel.width;
-  const y = (0.5 - (157 + row * 81 + 34) / 512) * panel.height;
+  const hit = controls.targets.filter((t) => t.id.startsWith("action:"))[
+    row * 2 + col
+  ];
+  const x = ((hit.x + hit.w / 2) / 1024 - 0.5) * panel.width;
+  const y = (0.5 - (hit.y + hit.h / 2) / 512) * panel.height;
   const world = [
     m[0] * x + m[4] * y + m[12],
     m[1] * x + m[5] * y + m[13],
@@ -158,6 +165,7 @@ try {
     await button(p, 0, 3); // main → view
     await button(p, 0, 2); // view → spatial
     assert.match((await state(p)).vr.sharedPage, /位置合わせ/);
+    await button(p, 0, 1); // spatial → optional measured alignment
     pages.push(p);
   }
   for (let i = 0; i < pages.length; i++) {
@@ -170,7 +178,22 @@ try {
     await capture(p, A);
     assert.equal((await state(p)).vr.calibration, "b");
     await capture(p, B);
+    assert.equal((await state(p)).vr.calibration, "c");
+    const C = [A[0], A[1], A[2] + (i === 0 ? -0.6 : 0.6)];
+    if (i === 0) {
+      await capture(p, [C[0], C[1], C[2] + 0.2]);
+      assert.equal((await state(p)).vr.alignmentCheck.acceptable, false);
+      await button(p, 1, 0);
+      assert.equal((await state(p)).vr.calibration, "checking");
+      await button(p, 0, 0);
+      await capture(p, A);
+      await capture(p, B);
+      ok("A C-point error over 5 cm cannot be confirmed; capture can restart");
+    }
+    // Independent point exposes swapped direction without altering the shared flight.
+    await capture(p, C);
     assert.equal((await state(p)).vr.calibration, "checking");
+    assert((await state(p)).vr.alignmentCheck.acceptable);
     const aligned = await state(p),
       { offset, yaw } = aligned.vr.alignment;
     assert(Math.abs(Math.abs(yaw) - (i === 0 ? 0 : Math.PI)) < 1e-5);
@@ -211,6 +234,37 @@ try {
   );
   const b = pages[0],
     c = pages[1];
+  await wait(
+    a,
+    () =>
+      JSON.parse(window.render_game_to_text()).room.participants.filter(
+        (p) => p.presence?.calibration === "aligned",
+      ).length === 2,
+  );
+  const participants = (await state(a)).room.participants;
+  assert.equal(participants.length, 3);
+  assert.equal(new Set(participants.map((p) => p.id)).size, 3);
+  await a.locator(".room-alignment").scrollIntoViewIfNeeded();
+  await a
+    .locator(".room-alignment")
+    .screenshot({ path: `${out}/03e-pc-status.png` });
+  await b.bringToFront();
+  await b.evaluate(() =>
+    xrDevice.controllers.right.updateButtonValue("squeeze", 1),
+  );
+  await frames(b);
+  await b.evaluate(() =>
+    xrDevice.controllers.right.updateButtonValue("squeeze", 0),
+  );
+  await frames(b);
+  await button(b, 1, 1); // measurement → spatial
+  await button(b, 1, 1); // spatial → sync
+  assert.match((await state(b)).vr.sharedPage, /PC・Quest/);
+  await b.screenshot({ path: `${out}/03d-two-headsets.png` });
+  await button(b, 0, 0); // sync → spatial
+  ok(
+    "Each headset and PC see the same two confirmation reports, independently of room edits",
+  );
   await button(b, 0, 2); // spatial → venue
   await button(b, 1, 0); // select booth 2
   await wait(
@@ -232,7 +286,7 @@ try {
   await frames(b);
   let afterMap = await state(b);
   assert.equal(afterMap.vr.venueView, "overview");
-  assert.equal(afterMap.vr.panelVisible, false);
+  assert.equal(afterMap.vr.controls.open, false);
   assert.equal(afterMap.vr.showVenue, true);
   assert.deepEqual(afterMap.vr.alignment, beforeMap.vr.alignment);
   assert.deepEqual(afterMap.audio.listener, beforeMap.audio.listener);
@@ -250,7 +304,7 @@ try {
     xrDevice.controllers.right.updateButtonValue("squeeze", 0),
   );
   await frames(b);
-  assert.equal((await state(b)).vr.panelVisible, true);
+  assert.equal((await state(b)).vr.controls.open, true);
   await button(b, 1, 1); // AR → virtual, preserving the map
   assert.equal((await state(b)).vr.displayMode, "vr");
   await button(b, 1, 3); // hide panel to see the map in the virtual sky
@@ -287,6 +341,11 @@ try {
   assert.equal((await state(c)).vr.calibration, "lost");
   assert.equal((await state(c)).resting, true);
   assert.equal((await state(b)).vr.calibration, "aligned");
+  await wait(a, () =>
+    JSON.parse(window.render_game_to_text()).room.participants.some(
+      (p) => p.presence?.calibration === "lost",
+    ),
+  );
   ok(
     "A reference reset invalidates only that device and requests recalibration",
   );
@@ -315,6 +374,41 @@ try {
   const snap = await state(a);
   rawSocket.send(
     JSON.stringify({
+      type: "ping",
+      sentAt: 42,
+      id: "spoof",
+      presence: {
+        mode: "ar",
+        calibration: "aligned",
+        frame: "0.6/0.75",
+        checkErrorM: 0.02,
+        head: [1, 2, 3],
+      },
+    }),
+  );
+  const presenceDeadline = Date.now() + 5000;
+  while (
+    !messages.some((m) => m.type === "pong" && m.sentAt === 42) &&
+    Date.now() < presenceDeadline
+  )
+    await new Promise((r) => setTimeout(r, 50));
+  const pong = messages.find((m) => m.type === "pong" && m.sentAt === 42);
+  assert(pong);
+  const self = pong.participants.find((p) => p.id === pong.selfId);
+  assert.equal(self.role, "viewer");
+  assert.notEqual(self.id, "spoof");
+  assert.equal(self.presence.checkErrorM, 0.02);
+  assert.equal(self.presence.head, undefined);
+  assert.equal((await state(a)).room.state.revision, snap.room.state.revision);
+  assert.deepEqual(
+    (await state(a)).room.state.flights,
+    snap.room.state.flights,
+  );
+  ok(
+    "A viewer reports only its own calibration without changing the shared flight or revision",
+  );
+  rawSocket.send(
+    JSON.stringify({
       type: "venue",
       id: "forbidden-venue",
       revision: snap.room.state.revision,
@@ -339,7 +433,31 @@ try {
   await c.locator("#vr-enter").click();
   await wait(c, () => JSON.parse(window.render_game_to_text()).vr.frames > 4);
   assert.equal((await state(c)).vr.calibration, "none");
+  await wait(
+    a,
+    () =>
+      JSON.parse(window.render_game_to_text()).room.participants.filter(
+        (p) => p.presence?.calibration === "aligned",
+      ).length === 1,
+  );
   ok("Reentry restores the shared map while requiring fresh local calibration");
+  const beforeFrameChange = (await state(a)).room.state.flights;
+  await a.getByLabel("基準点の間隔").fill("0.8");
+  await a.getByRole("button", { name: "会場の配置を共有に保存" }).click();
+  await settle(a);
+  await wait(
+    b,
+    () => JSON.parse(window.render_game_to_text()).vr.calibration === "lost",
+  );
+  await wait(a, () =>
+    JSON.parse(window.render_game_to_text()).room.participants.every(
+      (p) => p.presence?.calibration !== "aligned",
+    ),
+  );
+  assert.deepEqual((await state(a)).room.state.flights, beforeFrameChange);
+  ok(
+    "A changed table invalidates confirmation on connected headsets without changing flights",
+  );
   await a.setViewportSize({ width: 390, height: 844 });
   await a.screenshot({ path: `${out}/04-mobile-map.png` });
   assert(
@@ -352,6 +470,15 @@ try {
   );
   console.log(`${checks.length} spatial checks passed`);
 } catch (error) {
+  for (const [i, context] of browser.contexts().entries()) {
+    const p = context.pages()[0];
+    if (!p) continue;
+    await p.screenshot({ path: `${out}/failure-${i}.png` }).catch(() => {});
+    await fs.writeFile(
+      `${out}/failure-${i}.json`,
+      JSON.stringify(await state(p).catch(() => null), null, 2),
+    );
+  }
   console.error(error);
   process.exitCode = 1;
 } finally {

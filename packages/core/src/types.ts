@@ -27,6 +27,8 @@ export interface RouteSample {
   curvature: number;
 }
 export interface CompiledRoute {
+  /** Open routes end at their final pose rather than wrapping back to takeoff. */
+  loop?: boolean;
   routeId: string;
   revision: number;
   samples: RouteSample[];

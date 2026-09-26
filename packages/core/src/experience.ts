@@ -10,6 +10,7 @@ import {
   type SoundMixMode,
 } from "./airspace";
 import { flightPose } from "./flight";
+import type { SoundTraceMode } from "./sound-presence";
 import { compileShow, type ShowRecipe } from "./show";
 import { distance } from "./math";
 import { TowerDirector, type TowerFact, type TowerCue } from "./tower";
@@ -88,6 +89,8 @@ export interface LogEntry {
 }
 
 export class Experience {
+  soundTraceMode: SoundTraceMode = "soft";
+  setSoundTrace(mode: SoundTraceMode) { this.soundTraceMode = mode; this.notify(); }
   nowMs = 0;
   phase: SessionPhase = "EDIT";
   paused = false;
@@ -108,6 +111,8 @@ export class Experience {
   tower = new TowerDirector();
   aircraftDesign: AircraftDesign = { ...DEFAULT_AIRCRAFT };
   compiledShow: ReturnType<typeof compileShow> | null = null;
+  /** Plans the next start() may keep unchanged (shared sky reloads). */
+  reusablePlans: FlightPlan[] = [];
   get show() {
     return this.compiledShow?.recipe ?? null;
   }
@@ -119,7 +124,7 @@ export class Experience {
     this.route = compiled.flights[0].route;
     this.aircraftDesign = { ...compiled.recipe.flights[0].recipe.aircraft };
     this.airspace = {
-      aircraftCount: compiled.flights.length as 1 | 2 | 3,
+      aircraftCount: compiled.flights.length,
       spacingSec: 0,
     };
     this.history = [];
@@ -210,6 +215,7 @@ export class Experience {
     if (!this.canEdit) return;
     validateAircraft(design);
     this.compiledShow = null;
+    this.keepFocus();
     this.aircraftDesign = { ...design };
     this.log("aircraft_design", { ...design });
     this.notify();
@@ -227,7 +233,7 @@ export class Experience {
     });
   }
   get flightIds() {
-    return AIRCRAFT.slice(0, this.airspace.aircraftCount).map((a) => a.id);
+    return this.compiledShow?.flights.map((f) => f.id) ?? AIRCRAFT.slice(0, this.airspace.aircraftCount).map((a) => a.id);
   }
   get durationMs() {
     if (this.compiledShow) return this.compiledShow.durationMs;
@@ -237,7 +243,12 @@ export class Experience {
     );
   }
   get mixGains() {
-    return soundMix(this.flightIds, this.mixMode, this.focusId);
+    const ids = this.flightIds;
+    return soundMix(ids, this.mixMode, ids.includes(this.focusId) ? this.focusId : ids[0]);
+  }
+  /** Leaving a shared or composed sky can drop the focused slot (e.g. ST-02 of one remaining flight). */
+  private keepFocus() {
+    if (!this.flightIds.includes(this.focusId)) this.focusId = this.flightIds[0];
   }
   setAirspace(config: AirspaceConfig) {
     if (!this.canEdit) return;
@@ -270,6 +281,7 @@ export class Experience {
     // Compile first: errors preserve the last valid route and undo history.
     const compiled = compileRoute(spec);
     this.compiledShow = null;
+    this.keepFocus();
     if (remember) {
       this.history.push(structuredClone(this.spec));
       if (this.history.length > 30) this.history.shift();
@@ -340,7 +352,9 @@ export class Experience {
       this.airspace,
       delayScale,
       this.compiledShow?.flights,
+      this.reusablePlans,
     );
+    this.reusablePlans = [];
     this.tower.reset();
     this.fact({
       type: "scheduled",

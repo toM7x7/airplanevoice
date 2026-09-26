@@ -1,0 +1,44 @@
+[
+  {
+    "id": "lift",
+    "title": "▶ 浮上｜実装画面の録画。ふわっと浮かび、静かに収まる。普段の操作の第一候補。 音声なし。クリックで動画。",
+    "output": "03-motion-lift.png",
+    "href": "03-motion-lift.webm",
+    "status": "browser-recording",
+    "routeName": "CSSの開閉比較"
+  },
+  {
+    "id": "trail",
+    "title": "▶ 航跡｜実装画面の録画。細い線と順番に現れるボタン。航空機らしさを比較。 音声なし。クリックで動画。",
+    "output": "04-motion-trail.png",
+    "href": "04-motion-trail.webm",
+    "status": "browser-recording",
+    "routeName": "CSSの開閉比較"
+  },
+  {
+    "id": "ripple",
+    "title": "▶ 音の波｜実装画面の録画。波紋から面が広がる。聴き方の操作などへの候補。 音声なし。クリックで動画。",
+    "output": "05-motion-ripple.png",
+    "href": "05-motion-ripple.webm",
+    "status": "browser-recording",
+    "routeName": "CSSの開閉比較"
+  },
+  {
+    "id": "01-vr-pinch",
+    "title": "VR｜遠くは指してつまむ、手元に操作盤。将来の画面案・実機撮影ではありません。",
+    "output": "01-vr-pinch.png",
+    "href": "01-vr-pinch.png",
+    "prompt": "Use case: ui-mockup.\nAsset type: ONE review-only future VR interface concept for AIRPLANEVOICE, landscape 1536x1024. This is a first-person visual design mockup, not a headset screenshot or a claim that hand controls are already implemented.\n\nInput images: Image 1 is the aircraft identity, sky, lighting and calm atmosphere reference. Image 2 is the ivory/deep-teal UI palette and simple four-choice menu reference. Preserve those identities, but change the screen composition into a convincing first-person immersive VR scene with a small world-space panel and hand interaction. Do NOT copy the flat browser toolbar or the screen-centered desktop dialog from either reference.\n\nScene: expansive clear blue sky with a few pale clouds, a low grassland horizon and a short distant row of stylized green trees. The sky and aircraft remain the main experience, occupying the upper 70 percent with generous quiet negative space. One white civil four-engine passenger airliner with deep teal vertical tail, slim dark windows and swept wings flies gracefully in the upper-right, approximately 23 percent of screen width. All four turbofan engines should be anatomically plausible, clean and recognizable. Broad gentle golden side light glints on the white fuselage and wing, with no starburst lens flare. Stable, peaceful, heavy airliner flight, not an aerobatic or military pose.\n\nHands and panel: first-person viewpoint, no visible headset, no other person. Only two small natural human hands and short wrists enter from the bottom edge, kept below the aircraft and never dominating the composition. The left hand is relaxed near lower-left. A compact warm-ivory rounded rectangle menu floats just ahead of that left hand in the lower-middle of the view, apparently held steady in world space at a comfortable reach. The panel is NOT attached as a giant wristwatch and is NOT a flat screen overlay. Show subtle perspective and thickness, gently tilted upward toward the user's eyes, with clear depth separation from the hand and sky. The right hand approaches from the lower-right and uses an ordinary relaxed thumb-and-index pinch to select one option: thumb pad and index fingertip nearly meet, the other three fingers remain comfortably curved. Normal five-finger anatomy, no exaggerated gesture, no pointing gun shape, no controller. A tiny quiet teal selection dot and a softly tinted option are enough; no laser beam or glowing effects.\n\nUI: premium calm museum / airport wayfinding character. Warm ivory base, deep teal text, restrained pale sage cards, fine borders, spacious and readable. Small panel title メニュー. Four large accessible choices in a tidy 2 by 2 arrangement, using these short Japanese labels: 飛ばす, 音を聴く, 見え方, 案内. Pair them respectively with a simple airplane outline, speaker/sound icon, eye/layers icon, and question-circle/help icon. A small close symbol in one corner is acceptable. Avoid extra text, disclaimers, metrics, fabricated chat, tooltips or labels outside the panel. The overall menu should occupy roughly 30 percent of frame width and 24 percent of frame height; the hands are smaller visual accents around it.\n\nColor palette: warm ivory #F4F3EC, deep teal #154F55, pale sage #DEEBE5, clear blue #9BC7DC and warm golden sunlight. Render the airliner as an attainable high-quality 3D web-app model, environment restrained and cinematic but peaceful. Hand shading should feel integrated with the 3D scene, subtly stylized realistic rather than creepy photoreal cutouts.\n\nConstraints: ONE coherent landscape visual, not a collage. No bottom browser bar, no desktop chrome, no large fixed HUD, no sci-fi cockpit, no neon or rainbow glow, no huge wave rings, no extra aircraft, no extra fingers, no giant hand, no fighter jet, no text clutter. The defining idea is: a small, reachable spatial control panel below a beautiful shared sky, while ordinary hand pinching makes the menu feel natural.\n",
+    "status": "concept-not-implemented",
+    "routeName": "手で操作する空間"
+  },
+  {
+    "id": "02-ar-touch",
+    "title": "AR｜目の前のメニューへ指で触れる。架空の会場・将来の画面案。",
+    "output": "02-ar-touch.png",
+    "href": "02-ar-touch.png",
+    "prompt": "Use case: ui-mockup.\nAsset type: ONE landscape 16:10 spatial AR interaction design concept for AIRPLANEVOICE, first-person through the viewer's own eyes, high quality and plausible.\nPrimary request: develop a calm hand-and-finger direct-touch spatial menu from the supplied references. This is a future design concept in a fictional exhibition room, not an actual headset capture.\n\nInput images: Image 1 is the scene and product identity reference: small exhibition table, compact teal floorplan, white four-engine passenger aircraft with dark teal tail. Image 2 is the visual style and current control vocabulary reference: ivory rounded panel, pale muted mint button backgrounds, deep teal thin icons and Japanese text. Do not recreate a browser screenshot or the second image's screen-edge toolbar. Preserve the simple palette and airy feel.\n\nScene: a naturally lit neutral exhibition room, small fixed light wood table in front of the standing viewer. Warm white light and believable modest room architecture. Above the table sits a compact virtual dark teal low-relief floorplan with exactly three small unobtrusive markers 1, 2, 3. A small white FOUR-engine passenger airliner with a dark teal tail flies calmly above it, with a very thin short pale trajectory. Place the plane in a clear open part of the view and show two engines under each wing from a front three-quarter viewpoint. Space and airliner are the primary experience; controls support them.\n\nInteraction: a small ivory rounded rectangular control panel FLOATS IN WORLD SPACE just above the near right part of the table, tilted slightly to face the viewer. It is at natural arm's reach and about 30 cm wide, taking less than a quarter of the frame. It must have perceptible perspective and room behind it, NOT be fixed to the frame edge, NOT a full-width website bar. Show the viewer's own anatomically plausible right hand approaching from the lower right, with the right index fingertip physically touching one menu button. The touch target gets ONLY a tiny restrained warm amber contact ring at the fingertip; no rays, no lasers, no large glow. Natural hand scale and relaxed wrist, only partial forearm in frame. A second left hand is optional but if shown keep it small, relaxed and unobtrusive. Avoid giant hands, repeated fingers, twisted wrists, mannequin gloves or controllers.\n\nMenu: extremely clear and restrained. Small heading in Japanese \"メニュー\". Beneath it, three broad touch targets with simple meaningful line icons: speaker icon + \"音を聴く\", eye icon + \"見え方\", question-mark-in-circle icon + \"案内\". The right index finger touches the speaker target near its icon so the Japanese remains legible. Warm ivory panel, pale mint targets, dark teal typography, generous spacing. No other text, statistics, chat, notifications, logos, title banners or arrows.\n\nComposition: one coherent landscape image, camera is inside the user's first-person experience. Keep the room and aircraft unobstructed. No headset wearer seen from outside. No sci-fi HUD, holographic blue grids, neon, portals, lens effects, cockpit, glowing floor or collage. Sophisticated subtle spatial product design, warm ivory + deep teal + muted mint, amber used only for the single fingertip contact. Demonstrate intuitive direct touch with minimal visual noise.\n",
+    "status": "concept-not-implemented",
+    "routeName": "手で操作する空間"
+  }
+]

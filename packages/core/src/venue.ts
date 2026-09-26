@@ -32,6 +32,7 @@ export function checkedVenue(value: unknown): VenueMap {
     v.version !== 1 ||
     !valid(v.baselineM, 0.3, 2) ||
     !valid(v.tableHeightM, 0.4, 1.4) ||
+    (v.tableDepthM !== undefined && !valid(v.tableDepthM, 0.3, 2)) ||
     !Array.isArray(v.points) ||
     v.points.length < 1 ||
     v.points.length > 4
@@ -66,6 +67,9 @@ export function checkedVenue(value: unknown): VenueMap {
     version: 1,
     baselineM: v.baselineM,
     tableHeightM: v.tableHeightM,
+    ...(v.tableDepthM === undefined
+      ? {}
+      : { tableDepthM: v.tableDepthM as number }),
     points,
     selectedId: v.selectedId as string | null,
   };

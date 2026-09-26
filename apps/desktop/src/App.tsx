@@ -29,6 +29,12 @@ import { ObservationDeck } from "./ObservationDeck";
 import { ShowComposer, SHOW_DRAFT_KEY } from "./ShowComposer";
 import { VrRuntime } from "./vr";
 import { SkyTransfer } from "./SkyTransfer";
+import { AiTrialPanel } from "./ai/AiTrialPanel";
+import {
+  AssistantGuide,
+  skyContext,
+  useSkyAssistant,
+} from "./ai/sky-assistant";
 import {
   applySky,
   captureSky,
@@ -463,6 +469,7 @@ export function App() {
         now,
         e.recipe.lowFrequencyGain,
         e.designFor(arrival.flightId).engineCount,
+        e.designFor(arrival.flightId).sound,
       );
     window.render_game_to_text = () =>
       JSON.stringify({
@@ -562,6 +569,82 @@ export function App() {
     ARRIVAL: "残る音を待つ",
     INTERLAP: "ひと巡りの、余韻",
   }[snapshot.phase];
+  const assistant = useSkyAssistant(
+    () =>
+      skyContext(e, audio, {
+        surface: "desktop",
+        controls: [
+          "volume",
+          "sound",
+          "flight",
+          "aircraft",
+          ...(e.airspace.aircraftCount > 1 ? ["mix" as const] : []),
+          "fleet",
+          "settings",
+          "workshop",
+        ],
+        volume,
+        soundOn: audioReady && !muted && audio.context?.state === "running",
+        selected: inspectedId !== null,
+        selectedId: inspectedId,
+        menuOpen: diagnostics,
+        menuPage: diagnostics ? "sound" : "home",
+        canEdit: e.canEdit,
+        showActive: !!e.show,
+        settingsOpen: diagnostics,
+        workshopOpen: workshop,
+        mixMode: e.mixMode,
+      }),
+    async (a) => {
+      switch (a.control) {
+        case "volume":
+          changeVolume(Number(a.value));
+          break;
+        case "sound":
+          if (a.value === "on" && audio.context?.state !== "running")
+            return false;
+          setMuted(a.value !== "on");
+          audio.setMuted(a.value !== "on");
+          break;
+        case "flight":
+          if (a.value === "start") {
+            manual.current = false;
+            e.start(delay, e.phase === "INTERLAP");
+          } else if (e.paused !== (a.value === "pause")) {
+            e.togglePause();
+            if (e.paused) audio.stop();
+          }
+          break;
+        case "aircraft":
+          if (a.value === "none") clearSelection();
+          else {
+            setInspectedId(a.value as FlightId);
+            lookAtAircraft(a.value as FlightId);
+          }
+          break;
+        case "mix":
+          e.setMix(a.value as "balanced" | "focus", inspectedId ?? e.focusId);
+          break;
+        case "fleet":
+          e.setAirspace({
+            ...e.airspace,
+            aircraftCount: Number(a.value) as 1 | 2 | 3,
+          });
+          break;
+        case "settings":
+          setDiagnostics(true);
+          break;
+        case "workshop":
+          if (e.show) return false;
+          setWorkshop(true);
+          break;
+      }
+      return true;
+    },
+    (control) => {
+      if (control === "volume" || control === "settings") setDiagnostics(true);
+    },
+  );
   const altitude = Math.round(
     e.spec.rawPoints.reduce((sum, p) => sum + p.y / e.spec.rawPoints.length, 0),
   );
@@ -628,6 +711,7 @@ export function App() {
             {editing && !showEditor && (
               <button
                 className="workshop-toggle"
+                data-ai-control="workshop"
                 aria-expanded={workshop}
                 onClick={() => {
                   e.clearShow();
@@ -850,12 +934,20 @@ export function App() {
           {!editing && (
             <div className="flight-controls">
               {interlap && !snapshot.evolution.enabled && !snapshot.paused ? (
-                <button className="primary" onClick={() => void play(true)}>
+                <button
+                  data-ai-control="flight"
+                  className="primary"
+                  onClick={() => void play(true)}
+                >
                   <Icon name="play" size={16} />
                   <span>もう一周、眺める</span>
                 </button>
               ) : (
-                <button className="secondary" onClick={pause}>
+                <button
+                  data-ai-control="flight"
+                  className="secondary"
+                  onClick={pause}
+                >
                   <Icon name={snapshot.paused ? "play" : "pause"} size={16} />
                   {snapshot.paused ? "飛行を再開" : "ひと休み"}
                 </button>
@@ -874,6 +966,7 @@ export function App() {
             <div className="launch-controls">
               <button
                 id="start-btn"
+                data-ai-control="flight"
                 className="primary"
                 onClick={() => void play()}
               >
@@ -915,6 +1008,7 @@ export function App() {
                 <button
                   className={`glass-button info-toggle ${inspection ? "on" : ""}`}
                   aria-label="機体情報を表示"
+                  data-ai-control="aircraft"
                   aria-expanded={!!inspection}
                   onClick={() => setInspectedId(inspection ? null : "ST-01")}
                 >
@@ -934,6 +1028,7 @@ export function App() {
                 </button>
                 <button
                   className="glass-button sound-button"
+                  data-ai-control="sound"
                   onClick={() => void sound()}
                   aria-label="音声を切り替え"
                   aria-pressed={audioReady && !muted}
@@ -1068,8 +1163,42 @@ export function App() {
           onClose={closeTransfer}
         />
       )}
+      {vrState.status !== "presenting" && (
+        <>
+          <AiTrialPanel
+            onSpeakingChange={audio.setSpeaking}
+            integrated
+            disabled={false}
+            getContext={assistant.getContext}
+            onAction={assistant.execute}
+            onGuide={(kind) => {
+              if (kind !== "none")
+                void assistant.execute({
+                  mode: "guide",
+                  control: "volume",
+                  value: String(
+                    Math.max(
+                      0,
+                      Math.min(70, volume + (kind === "volume-up" ? 5 : -5)),
+                    ),
+                  ),
+                });
+            }}
+          />
+          {assistant.guide && (
+            <AssistantGuide
+              text={assistant.guide.text}
+              onClose={assistant.clear}
+            />
+          )}
+        </>
+      )}
       {diagnostics && (
-        <section className="settings" aria-label="音と表示の設定">
+        <section
+          className="settings"
+          aria-label="音と表示の設定"
+          data-ai-control="settings"
+        >
           <div>
             <h2>音と表示</h2>
             <label className="spacing-label">
@@ -1089,6 +1218,7 @@ export function App() {
               音量 <span>{volume}%</span>
               <input
                 aria-label="音量"
+                data-ai-control="volume"
                 type="range"
                 min="0"
                 max="70"
@@ -1180,7 +1310,7 @@ export function App() {
               <dd>{vr.diagnostics.frameMsP95?.toFixed(1) ?? "—"} ms</dd>
             </dl>
             <p>
-              この版はPC・Questで一人用の試作です。最大3機で聴き比べられます。管制字幕はPC上の定型案内で、AIは未接続です。Quest実機の快適性・複数端末での共有は未確認です。
+              この画面は単体の空です。最大3機で聴き比べられます。管制字幕は定型案内です。AI案内では操作場所の強調と対応する設定変更ができます。共有する空は「一緒に飛ばす」から開けます。
             </p>
             <p>
               {offlineReady

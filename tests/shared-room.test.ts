@@ -79,7 +79,8 @@ describe("shared room authority", () => {
     const queued = launch(edit, first.startsAt + 100, "launch-0002");
     expect(queued.flights[0]).toEqual(first);
     expect(queued.flights[1].recipe).toEqual(edited());
-    expect(queued.flights[1].startsAt).toBeGreaterThanOrEqual(first.clearAt);
+    expect(queued.flights[1].startsAt).toBe(first.startsAt + 100 + 15000);
+    expect(queued.flights[1].startsAt).toBeLessThan(first.endsAt);
     expect(first.clearAt).toBeGreaterThan(first.endsAt);
     expect(() => launch(queued, first.startsAt + 200, "launch-0003")).toThrow(
       "予約済み",
@@ -195,8 +196,10 @@ describe("shared absolute-time playback", () => {
     expect(p.flightId).toBe(first.id);
     p.tick(state, second.startsAt + 10);
     expect(p.flightId).toBe(second.id);
-    expect(e.pose().position.y).toBeGreaterThan(250);
-    expect(e.startAtMs).toBe(second.startsAt);
+    expect(e.pose("ST-02").position.y).toBeGreaterThan(250);
+    expect(e.flights).toHaveLength(2);
+    expect(e.flights[0].startAtMs).toBe(first.startsAt);
+    expect(e.flights[1].startAtMs).toBe(second.startsAt);
   });
   it("cancels the first countdown back to the preview and fails on engine mismatch", () => {
     let state = launch();

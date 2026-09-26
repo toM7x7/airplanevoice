@@ -1,5 +1,246 @@
 Original prompt: 空repo https://github.com/toM7x7/airplanevoice — 資料を読み取って内容を理解しつつ、開発を進めていってほしい。
 
+## 2026-09-24 会期中メモ：VR初回のAI操作案内
+
+- 利用者の要望：VRの操作UXが難しい場合、ヘッドセットを装着して入った直後からAIが起動し、クリック場所を案内するジャービス的な支援があるとよい。
+- 設計メモとして追加。画面案内と対象ボタンの強調、現在のVR/AR画面に沿ったガイドを検討する。GPT-Liveの音声・マイクは自動で開始せず、利用者が選択して開始する想定。
+- 初回入場の迷いを減らす提案で、未実装。実機での有効性・案内文・閉じ方は次の設計／Quest確認で評価する。
+
+## 2026-09-23 展示持ち込み版・別PCへの引き継ぎ
+
+- PC景色相談を専用の構造化下書きへ接続。一般的な説明だけで終わらず、名前・高さ・密度等を一度に反映。共有は本人が確定。
+- 258件・Worker型・ビルド・2ブラウザの明示的景色共有を確認。公開実AI1回で複数パラメータの案を取得、展示ルームは変更していない。
+- Worker 91cbcb3d-f9cc-423e-a41b-b214c0688393 / Pages ce3b5de9。配信物・公開共有・模擬XRステレオを確認。実Quest受入は別。
+- 現在のPC映像で60秒／30秒PVを制作。AI固定応答・旧日付のQuest実機収録を明記。A4横・白黒の説明紙と離席札。GPT-Live表記に統一。
+- ROADMAP.md / HANDOFF.md / docs/exhibition-runbook.mdを再開入口として追加。最新ブランチはfeat/exhibition-flight-studioで、PR #1未マージ。
+- 次：展示で一巡確認し、個別のVR操作・聴感・負荷を修正。建築様式、会場マップMCP、スマホ位置合わせは未完成のまま残す。
+
+## 2026-09-23 独立レーダー・帰還・機体／空間の制作
+
+- レーダーを独立してピンチ／グリップで移動、頭やメニューに追従させない。PCではヘッダーをドラッグ。
+- 新しい飛行に進入・着陸・減速・格納庫への移動を追加。滑走路予約が重なれば巡航を延長。参加者の出発順は優先。
+- 名前で選んだ巡航機へ頭上／広く／高くの指示。過去の音を保持して未来の音源位置だけ更新。
+- 共有画面の音ミックスを実音声バスへ接続。全体／強調／一機だけ。
+- 6形状、色・太さ・後退角・エンジン・翼端。Jevの候補選択を検証して下書きへ。応答中に編集された機体は上書きしない。
+- PCで5種の景色をパラメーター編集→人が確定して共有。自由視点はPCローカルのみ。
+- 単体249件＋追加Jev2件（関連32件）、型・ビルド、模擬VR、共有景色、実Web Audioを検証。詳細は docs/journey-radar-environment-2026-09-23.md。
+- GitHubへ現在までのソースと設計資料を整理して保存。実機聴感・端末負荷・実AI提案品質・スマホの座標合わせは未検証。
+
+## 2026-09-23 レーダー・音響マップ・出発待ち・VR操作の改善
+
+- 最大24機（標準6）、参加者の出発予約64件、最低15秒間隔。自動便の機体選択/停止と参加者予約を分離。運営コメント・方針を次の自動便判断へ。
+- PC/XRの独立レーダーに機体/航路・到来音の位置を表示。重なる機体は繰り返して選ぶ。
+- VR寸法タブと手元模型の再呼び出し、取っ手の掌/ピンチ/グリップ、指を閉じる途中の模型への誤捕捉を修正。
+- AIの選択・VRパネル情報を先頭へ、保存機体IDとの対応、menu:new、寸法編集共通コマンド。
+- 詳細と実機で残る項目は docs/radar-and-departure-2026-09-23.md。会場マップは次の仕様相談。
+- Unit241/46、build/worker型検査、実Worker予約・自動便管理、模擬XR制作16/グラブ5/24機レーダー、Web Audio最大24機を確認。公開Worker 1c5cc94c-a7d9-4dbd-b005-f0a02c890cdd / Pages 7dbfa139 / bundle 41e86ff8892ca2b5。公開HTML/JS/SW一致と共有接続・ステレオ確認。公開機数は既存12機のまま維持。実Questと有料AIの応答品質は未確認。
+
+## 2026-09-23 ①音・VRと②裏方Jevを実装、Quest確認へ
+
+- ユーザー決定：①② → Quest 3確認 → ④会場マップ＋⑤MCP案内をセット。③チュートリアルは今回追加しない。
+- 保存/出発受付/エラーの短い音、受信音声メーターに基づく50%ゲイン調整と復帰、VR音サブページ、到来音の薄い厚み/線/非表示、VR出発待ち秒数を追加。
+- 12機時に旧3機分の軌跡バッファを超える可能性を修正。最新384点まで描画、古い点から省略。
+- 巡航30秒の3秒間隔予測と地上原点の音の重なり目安をJevへ追加。次の自動便の間隔・高度選択、採用/適用/失敗/遅延破棄の履歴20件、API回数を運営へ。保存機体と飛行中の航路は不変。
+- Unit233/45ファイル、Worker型検査、build成功。Web Audio1/3/6/12機と24音源上限、受信MediaStreamによるduck/復帰/ミュート、模擬VR12機と音メニューを確認。有料AIなし。音の質・指操作・Quest負荷・実Jevは未確認。
+- 模擬PC＋XR16項目、グラブ5項目成功。グラブ検査の共有URL指定漏れを試験側で直して再実行成功。
+- 公開Worker4880b0e2-ce12-46e6-9afa-5a2516c8a85d、Pages7a40f059、bundle6cd4b1fe9803df5f。公開アセット一致・実共有接続・運営履歴・模擬両眼メニュー確認。最後に次便の保存名と高度候補の照合を追加、Worker5試験と型検査を再実行して反映。
+- 証拠 output/stages12-2026-09-23、仕様 docs/sound-and-traffic-2026-09-23.md。試験用8787/5173を終了。実機確認後に④⑤へ進む。
+
+## 2026-09-23 VR主要ページ・同時機数・裏方の運行調整
+
+- 同時3機固定を標準6／最大12へ拡張。運営UIで3・6・9・12を選択し、空き枠への連続自動出発、手動便優先、基準高度の割当、飛行IDと音源の維持を実装。
+- VR主要ページの固定位置の戻る、共通AR/VR切替と呼び寄せ、4機ずつの一覧を実装。前回の取っ手・模型グラブの固定を再検証。
+- Jevは部屋単位の裏方として次便間隔を15／30／45秒から選択。オフが初期値。接続者あり＋繰り返し運行時に最短30秒間隔。検証済み選択だけ採用、遅延・失敗は規則に戻る。飛行中の回避操縦ではない。
+- Unit225件、Worker型検査、build。PC＋模擬XR16項目、グラブ5項目、ローカル設定4段階、12機の両眼描画・一覧3ページ・選択、6／12機の同時波形と24音源上限を確認。有料AI呼び出しなし。
+- 長時間シミュレーションの5秒制限が負荷試験との同時実行で1件タイムアウト。対象試験の制限を15秒にし全件再実行成功。Quest実機の負荷／聴感と実Jevの応答は未確認。
+- 公開Worker10411b47-6b7d-4581-bd28-dee777cee2d1、Pages0c74d736、bundle f6409a62019274ba。公開のアセット一致・共有6機設定・運営UI・模擬VRバーを読み取り検証。証拠 output/traffic-vr-2026-09-23、仕様 docs/vr-traffic-2026-09-23.md。
+
+## 2026-09-22 選定した世界観を実装: PC格納庫/編集/観察とXR AI
+
+- WorkbenchでPC画面を格納庫・つくる・空を眺める・部屋/運営へ分離。項目は形/色/音/航路/名前、保存と飛行は下端。単独のPC来場者も一巡できる。
+- Scene/CreationModelにローカル背景比較を追加。同じ姿勢・レシピで格納庫/空港/空を比較。手元模型と大きなPC模型を分け、Canvas/部屋接続/飛行は維持。
+- 共通の機体切替確認、未保存の保存/破棄/取消。保存状態を再読込時に照合。名前・飛行中機体を不用意に上書きしない。
+- XRで認証済みAIの初期化、Jev開始/停止を追加。GPT-Liveの既存開始/終了/ミュートを維持。操作案内は隠れた旧メニューではなく可視の対象を選ぶ。AIコンポーネントを画面移動で作り直さない。
+- Unit189、Worker型検査、build、dry-run通過。PCフロー10項目と模型マウスドラッグ、模擬XR/共有/AI fixture12項目通過。有料API呼び出しなし。
+- 検証でAIパネルが右の編集を遮ったため、統合画面では小さな操作列へ畳める形に調整。空背景の地面色が残る問題も修正。テスト用の部屋頻度制限は専用DBに隔離。
+- 証拠: output/workbench、同/xr、同/skill-final。仕様と残工程: docs/workbench-implementation.md。
+- Quest実機のマイク許可/手操作/音の聴感は未確認。XRカードのサムネイル、恒久保管、離着陸/帰還、会場案内は後続。
+- 公開更新: b6d4c396-68d9-44ef-a841-c3542b27c5bc / 0f13a36bc968fe38 / index-CnoU5qHg.js。既存Accountのwhoamiと直前Versionを確認し、keep-varsで配信。公開health・HTML/sw照合、PC主要フロー10項目成功。テスト用8788/8789は終了、通常8787は継続。
+
+## 2026-09-21 品質目標の訂正・制作の主端末を確定
+
+- 利用者の明示：厳密な飛行性能と音のリアル再現は不要。寸法・距離・大きさ・頭上通過の存在感が目標。
+- 一機に見惚れる→持ち寄った機体が飛び交う→会場の順。PCブラウザで機体・航路・音を作ることを中心にし、Questは観察と軽い調整を優先。
+- Jevの判断支援を視界の観察と制作の候補選びの両方へ。常時観察と常時発話を分ける。
+- 現行正面フライバイの設定を確認し、ユーザー位置の頭上を保証しないことを確認。次実装の最終航路・接近距離の受入を仕様へ追加。今回は仕様更新で公開コードの変更なし。
+
+## 2026-09-21 実寸監査・会場外の基礎とJevの役割
+
+- 利用者訂正：JV/ジェブはTypeSafeのJev。対話を有用にするため、独立観察と制作エンジンの候補選択にも活かす方向。会場は次点、単体VR/ARの基礎を優先。
+- 生成ジオメトリの境界を実測し、標準胴体71 m・主翼64 mを確認。XRのrigは剛体変換で、頭の実測姿勢を使う。速度58 m/sは観察用、音もスピーカー補正あり。実機性能/音圧の再現とは区別。
+- 既定制作ルートの生成点群から距離約568〜2291 mを算出。最終曲線・保存中ルームの測定ではない。output/scale-audit/2026-09-21.json。
+- 現行skyContextが距離・半径方向速度・信号dBまでを渡すことを確認。視野、姿勢、環境の統合は次工程。TypeSafe公式のChoice/Score/Noulを調査し、物理計算・候補選択・対話の役割を分けて設計。
+- docs/core-experience-baseline.mdに基準フライト、実寸/模型、聴取点、コンテキスト、制作比較を整理。公開コード変更・追加の有料AI呼び出しなし。
+
+## 2026-09-18 運営PC＋Quest 3、机の手動配置・共有指操作
+
+- 利用者の実機報告を受け、Quest 2は予備へ。PCとQuest 3の同じ部屋での編集・飛行共有は維持し、複数Questの現実位置一致は展示の必須条件から外す。
+- 現在の頭の位置・水平向きから机のABCD枠を正面へ呼び、左右前後5 cm／高さ2 cm／向き5°で動かす。枠の中心で回転。横幅と奥行きを別指定。旧部屋は正方形として読める。
+- 手動の目視確認（placed）とC点での誤差測定（aligned）を区別し、PCにも報告。位置合わせはローカルrigだけを変え、共有飛行を編集しない。再入場・机寸法変更・追跡喪失で確認を解除。
+- SharedControlSurfaceを追加して、共有ルームへhand-tracking・遠隔ピンチ・近接タッチを接続。短い開閉、常設メニューバー、手元へ呼ぶ、重複タッチ防止、コントローラー代替。閉じた操作面が機体選択を遮らず、縮小地図も表示できる。変化がないフレームではCanvasの再描画・テクスチャ転送を省く。
+- ユニット172件、Worker型検査、ビルド成功。PC＋模擬Questの手動配置・指操作6項目、既存共有10項目が成功。実画面のスクリーンショットと技能のブラウザクライアント出力を目視確認。Quest実機のQ1〜Q4は未実施で、模擬試験を実機合格と扱わない。
+- Cloudflareの従来アカウントを再確認し、a2ecc56a-876a-4136-9ce0-efb2ec3be91bを公開。公開Workerの接続報告6項目成功。公開HTML・主要JS・service workerのSHA-256一致、公開ページの3D画像も確認。AI有料API呼び出しなし。
+- 次は航路→機体→音の制作品質。docs/creation-quality-roadmap.mdに工程と受入基準、docs/table-alignment.mdに当日の運営手順を記録。AI/TypeSafeの新規拡張は後続。
+- 注意：旧2台向けtest:spatialは新しいメニューの座標・画面遷移へ追従させたが、今回は全13項目を再実行していない。展示主構成のtest:operatorと既存test:sharedを検証。実機の文字サイズ、腕の負担、装着者交代は次回確認。
+
+## 2026-09-18 複数Quest・現実の位置合わせを先行
+
+- 利用者の指示でAIの実装は据え置き、2台で共有して現実に重ねる基盤を進める。音声はQuest内メニュー中心、豊富なTypeSafeコンテキストは設計へ記録。
+- 接続ごとの位置合わせ報告を既存のheartbeatへ追加。部屋の編集権限と端末の報告を分け、飛行状態・版・alarmを変えない。PCとXRに端末一覧と確認済み台数を表示。
+- A/Bに独立したC点測定を追加。5 cm以内で目視確認へ進める試作基準。Cは座標を合わせ込む計算には使わない。再入場・追跡喪失・机の基準変更では確認を解除。
+- Cloudflareの認証変更を確認。利用者の指定どおり従来のAccount IDへ再ログインし、CLIのアカウント一致を確認。
+- ユニット168件・Worker型検査・ビルド成功。PC＋模擬Quest 3/2の位置合わせ13項目、WebSocketの参加状態5項目が成功。技能指定のPlaywrightクライアントでも起動・状態出力・画像を確認。実機T1〜T4は未実施。
+- 既存共有の回帰10項目成功。C点確認・状況画面の遷移を追加したPlaywright検証では、状況画面のボタンが通常と異なる高さにあるため操作ヘルパーを補正し、13項目を通し直した。画像とconsole errorなしを確認。
+- Cloudflare版5340161c-e3f6-4f8c-87a2-375b7b5b4045へ反映。配布index.html・SharedApp-BmHa1d6u.js・index-OWyZ-INP.js・sw.jsのハッシュ一致、公開ページの3D描画を目視確認。公開Workerでも端末状況5項目成功。AIの追加課金テストなし。
+
+## 2026-09-18 音声・クリック・指操作と管制官の体験仕様（設計のみ）
+
+- 利用者の指定どおり実装を進めず、docs/ai-guide-spec.mdを更新。メニュー自体の発見性と、案内対象の見つけやすさを別々に評価する方針。
+- 飛行前の相談→下書き→本人の調整→飛行、案内／代行、変更結果と戻す、声と手操作の競合、選択対象と発話の対応を仕様化。XR内の音声・強調表示は未接続と明記。
+- TypeSafeの注目点はカード・任意の管制官解説・Liveの文脈・次の設定候補へ。混雑の定義、観測時刻、各端末の聴こえ方を区別し、観察だけでの自動変更は別段階。
+- AI未接続・課金未開始という古い仕様書の記述を現在の実装記録に合わせた。撤去済みの時間／回数制限と将来の予算候補を区別。
+- ソース変更、ビルド、デプロイ、マイク使用、有料API呼び出しは行っていない。今回の確認範囲は文書と参照先の整合のみ。
+
+## 2026-09-18 通常画面へのAI操作・TypeSafeの次の行動
+
+- 利用者は別件に集中して実機確認を休止。開発は、会話だけでなく強調表示・設定変更・通常操作・ツール呼び出しまで含めて進める指示。TypeSafeが観察した後の活用も整理。
+- 単体のAppと共有のSharedAppにAI案内を統合。旧試用URLは通常画面へ移す。単体8種類の操作契約、共有は端末内の音・機体情報を接続し、共有の飛行予約変更は今回扱わない。
+- Responses function calling→検証済み操作→ブラウザ結果報告→Live返答を実装。完了を設定値で判定し、期限切れ・重複・別タブ・存在しない機体・未対応操作を制御。結果文に追加LLMは使わない。
+- 通常画面で音量強調・35→25%・1→3機・飛行開始停止・ST-02情報表示を模擬APIで検証。編集時にactive fleetが空となる不整合を修正。設定機体を待機としてAIへ渡す。
+- TypeSafeは距離・接近速度・端末内の音声信号等から注目点を選び、本人が押す次の行動へつなぐ。音声波形・音色の意味・実聴感の理解とは区別。勝手なミキシングや航路変更はしない。
+- 今回のAPI検証は全てローカルの模擬応答。有料推論・音声を追加利用しない。実マイクでの指示と、XR内AIの強調表示・共有変更は後続。
+- 164テスト・Worker型検査・ビルド成功。Cloudflare版c391c458-d0ca-4954-abb4-b8b9cdf8580fへ配置、配布JSハッシュ一致と通常画面の接続を確認。旧URLも?ai=guideへ移行。配置前後の利用履歴80/2/6は不変、観察OFF・音声closed。
+
+## 2026-09-18 自動切断の修正と試用制限の撤去
+
+- 利用者が勝手な音声停止と開発検証による残り回数減少を報告し、試用制限の撤去を指示。回数・5分の時間制限・試用期限を撤去し、回数は履歴のみへ変更。入場キー、重複送信・二重起動防止は維持。
+- sidebandの接続用AbortSignalが成功後10秒でWebSocketを切り、切断処理が会話まで終了させる不具合を発見。ローカルworkerd＋WebSocketのみで再現し、接続完了後のタイマー解除と同一セッションへの再接続へ修正。新しい有料会話は自動作成しない。
+- タブ非表示と20秒のheartbeat切れによる会話終了も撤去。古い状態のTypeSafe観察は更新待ちとなり、新しい状態で再開する。実際のページ終了・パネル終了・明示終了は停止する。
+- 154テスト、Worker型検査、配布ビルドが成功。1時間経過、旧回数超過、旧期限経過、sideband復旧、タブ切替の模擬検証。今回の修正検証で有料音声・文字回答・観察は追加実行しない。実マイクでの継続は再試用待ち。
+- 提供されたruntime.lastErrorは拡張機能の通信を疑う別件。THREE.Clock警告とfavicon 404も今回再現した切断原因とは区別。詳細はdocs/ai-web-trial.md。
+- Cloudflare版e4993e8b-1506-4d2a-ae46-165b7c021d3aに反映し、公開API・配布JSのハッシュ・Chrome画面を確認。画面更新後は観察OFF・音声closed、履歴は72・2・5。今回の音声API追加利用なし。
+
+## 2026-09-18 継続対話と将来の機体登録メモ（下記の試用上限は後に撤去）
+
+- ユーザー希望はGPT-Liveを開始した後そのまま対話し続けること。試用は最大5分へ変更し、終了・残り時間・マイクのミュート／復帰を追加。常時自動ON、自動再接続、試用回数のリセットはしない。
+- 委譲を8件で黙って捨てていた制限を修正。入力字幕は断片・時刻を保持し、同じ話者の文字片の間へ毎回ラベルを挟まない。新たなセッションを作らずに質問を続ける。
+- 150テスト、Worker型検査、ビルド成功。模擬イベントで10回の案内、90秒を超える継続、5分終了・ミュート復帰・終了後の独立観察を確認。有料APIは追加実行せず、3回の残りを維持。実マイク往復は利用者の試用待ち。
+- 名前付きの自作機体・音設定をPCで保存しVRで呼ぶ案、来場者の自分の1機とランダムな複数機が飛び続ける案をdocs/idea-notes.mdへ追加。保存数／シミュレーション数／表示数／発音数を分けて後続設計する。現行の3機上限は今回変更しない。
+
+## 2026-09-18 CloudflareのSecret確認とAIのWeb試用
+
+- 利用者が登録したOPENAI_API_KEY / TYPESAFE_API_KEYを名前のみ確認。APIキーは読み取らず、Worker実行時に利用。
+- AiTrialを既存部屋とは別のDurable Objectとして追加。運営用の入場Secret、期限、1タブ制限、観察120回・回答20回・音声6回の送信前予約、90秒の終了要求、古い状態・画面非表示・終了不明時の停止を実装。
+- TypeSafeの10秒観察、GPT-Live WebRTC + sideband + client delegation、共通の軽量LLM、文字相談と既存の音量ガイドをPC試作へ接続。モデルが存在しないUI名を出したため、音量の次手順はアプリ定義から返すよう修正。
+- Cloudflareへ配置。実APIの文字回答・飛行中の注目点を確認し、本人操作で35%→30%の完了表示を確認。音声3回は無音ストリームで開始・日本語挨拶字幕・session.closed・各15秒のusageを確認。実マイクの会話とQuestは未検証。テスト用差し替えは再読み込みで解除。
+- 詳細と残りはdocs/ai-web-trial.md。共有AI・MCP・通貨ベースの予算は未実装。GitHubへのpushは行わず、Cloudflareのみ反映。
+- 最終145テスト・Worker型検査・ビルド成功。音量上限で変更の案内を始めない処理も追加。版9a14718c-6f62-4aec-98ec-cb60dbf9f6e1を配置し、観察OFF・会話closed、利用7/120・2/20・3/6を確認。
+
+## 2026-09-18 AIの実装先整理と、PC操作案内の予行
+
+- ユーザーがGPT-Liveは常時ONにせず、2つのAIの実装方法・場所を整理してWebで試す方針を確認。追加で、案内しやすいメニュー・UIの再確認を依頼。現行Worker、部屋認証・ack、状態観測、TypeSafeアダプター、新旧UIを点検した。
+- docs/ai-implementation-plan.mdを新設。既存コードと新設予定のファイル・API、Vite 5173→Worker 8787、WebRTC、client delegation、sideband、予算・終了制御、TypeSafe独立観察、Web試用の段階を記録。既存SkyRoomのalarmは終了・次便の準備に使われているため、観察用DOは別にする。Cloudflare・OpenAI・TypeSafeの公式仕様を確認。
+- ControlLabへ「操作案内を試す」を追加。ControlDockで案内カード、panel/dockを区別した1対象の強調、状態に応じた次の操作、本人が音量を変えた後の完了を接続。音量設定と再生開始を分けた説明。途中の閉じる・別ページ・上限70%・2分の失効を扱う。PC用の定型ガイドで、XRへ入ると終了する。
+- 実ブラウザでメニュー→聴き方→音量35%から40%へ→完了を確認。1366×768で案内と対象が同時に見えること、390×844で横スクロールなし・対象ボタンとカードが画面内に収まることを確認した。Quest実機やAI音声の確認ではない。
+- 新規ガイド3件を含めユニット132件が合格。TypeScriptと配布ビルド成功。既存の大きいJSチャンク注意は残る。APIキー設定・有料API実行・公開配置・commit/pushはしていない。
+
+## 2026-09-18 GPT-Liveの人向けアシストとTypeSafeの独立観察
+
+- ユーザーがGPT-Liveでの計算を指定し、TypeSafeは人の操作とは別の時間軸で飛行状況を見続ける役と補足。仕様・進捗・音声・TypeSafe資料を更新。会話時だけTypeSafeを呼ぶ前提から、1空間1つの独立した観察ループへ変更した。
+- 初回案は飛行中10秒間隔＋変化時、最短5秒、同時1件、最新の状態へまとめる。アプリが確定事実と短い履歴を作り、TypeSafeが注目点や候補を選び、会話はそのメモと質問時の最新状態を読む。観察・解説・自動調整を別にする。空間終了・無人・状態不明・予算で停止。
+- GPT-Liveのclient delegation、本文を含まないdelegationイベント、transcript、thinking/commentary、累積usageと終了確認を公式文書で確認。本人が押して変えられる案内を基本とし、依頼された操作代行も同じ検証へ接続する設計。軽量LLMの文章化は必要時、Aivisを声の二重生成として足さない。
+- 費用計算を会話時間と観察時間へ分割。仮換算160円/USD、TypeSafe 1回1,000入力token・1質問なら1空間8時間・10秒間隔で約19.35円。100人×90秒のLive＋会話3応答の軽量LLM＋観察で約1,269円、2倍予備込み約2,600円。3分会話なら約2,469円／計画5,000円。4台でも同じ空間の観察を重複課金する前提にしない。
+- 地図はMCPで取得する展示情報、登録した地点と実測座標、TypeSafeの候補選択、GPT-Liveの説明を分担。地図だけから人流や通れる場所を推測して誘導しない。
+- 仕様とオフライン計算の更新。独立観察・Live会話は未実装、有料API呼び出し・公開配置なし。アプリ本体の既存作業は保持。
+- 検証：観察回数・空間数による費用増加・会話時間による差額・合計額のassert、スクリプト構文、更新資料4本のローカル参照50件、git diff --checkが合格。アプリの実行テストは今回の変更対象外。
+
+## 2026-09-18 AI・MCPを先行する仕様と費用
+
+- ユーザーが、複数Questの実機確認を待たずAI・MCPを優先し、Quest単体でも成立する方向へ変更。進捗・方針・再設計・制作・操作部品・技術一覧を更新。T1〜T4は0/4のまま後で再開し、開発の前提にしない。
+- docs/ai-guide-spec.mdへ、管制官の画面例、状況を聞く／操作を教える／会話で操作／展示を探す、操作IDによるボタンの強調、完了イベント、案内停止を具体化。案内と実行、自分だけと共有の操作を区別し、ボタンでも同じ処理を呼べる設計。自動案内はローカルの状態機械を基本にする。
+- OpenAIの料金・Realtimeの履歴課金・GPT-Liveの時間課金・hard spend limits、Aivis／TypeSafe／Cloudflareの公式料金を確認。100人×90秒・3応答・キャッシュ割引なし・仮換算160円/USDの計算を用意。TypeSafeを含むRealtime mini算定約538円、標準約2,022円。2倍の予備込みは約1,100／4,100円。2倍は最大額の保証ではない。
+- 小規模20会話、1台8時間、4台8時間、文字のみ・Aivis連結・GPT-Liveも比較。日次枠の提案は検証1,000円／展示5,000円、未確定・未設定。サーバー側の枠確保、会話終了、各社の料金集計を仕様化。OpenAIの月次hard limitも少額超過があり得ることを記録。
+- scripts/estimate-ai-cost.mjsとdocs/ai-cost-estimate.jsonを追加。ネット接続やAPI呼び出しなしで試算を再生成。実usageによる見積もりではなく、前提を明記した計算。
+- 展示MCPへinitialize/tools/list、get_event_info、search_exhibits（game・1件）、得たIDによるget_exhibitを実行し成功。公開情報のみを取得。証拠はoutput/ai-spec/expo-mcp-probe.json。スキーマはブース番号・地図リンクを持つが、実測m座標を持たない。アプリ接続やグローバルMCP設定変更は未実施。
+- 今回は仕様、費用計算、公開MCPの読取確認まで。マイク・有料AI／音声APIの実行、アプリ機能変更、公開配置は行っていない。
+- 費用の主要計算値・スクリプト構文・Markdown 33本のローカル参照275件・git diff --checkを確認し合格。アプリコードのテストは今回再実行していない。
+
+## 2026-09-18 全体進捗・残る実装・技術候補の棚卸し
+
+- 現行SharedApp、入口の分岐、共有Worker、部屋状態・権限、操作定義、TypeSafe接続口を資料と照合。単体公開／共有公開／ローカル操作試作の範囲と未接続部分をprogress-overview.md冒頭へ集約。公開状態は既存の配置記録を参照し、今回の再配置・再受入として扱わない。
+- 10領域の現在地・残作業・完了条件、実機校正と開発統合を並行する順序を記録。参加者向け部屋一覧、VR内移動、固定入口、作品／会場の長期保存、制作UI、会場図→案内飛行、AIを未実装の工程として整理。新しい完成率は作らず、校正の実機T1〜T4は0/4を維持。
+- technology-experiments.mdへ、既存基礎／近い接続・実験／各エンジンの品質／発展候補を整理。BANGEO、WebGPU、HTML UI、Blender、MCP、音声、実飛行API、PLATEAU、実機計測等の行き先を揃えた。外部技術を全件再調査した意味ではない。
+- 「TypeSafeをエンジン部分にも使う」を受け、次周の飛び方・音の性格・部品構成・管制判断の差し替え実験を追加。Choice／Score／Noulの公式仕様を再確認。候補提示だけに固定せず、許可した変化幅の自動適用を比較する設計案を記録。共通の判断結果を記録・共有し、端末間の再推論差を避ける。実API実行なし。
+- 部屋資料の古い「観覧権限なし／1時間のみ」と、発想メモの古いQR未確認表記を現況へ修正。README・方針・体験／エンジン設計から進捗と技術一覧へ参照を追加。元のWordやキーワード原文は変更していない。
+- 今回は資料のみを更新。アプリ機能の変更・公開配置・commit/pushはしていない。コードのテストは再実行せず、直前の129ユニット・ビルド・PC／模擬Quest成功を日付付きの既存結果として扱う。
+- 資料11本のローカル参照162件を確認し、参照先欠落なし。git diff --checkも合格。
+
+## 2026-09-18 控えめな開閉へ修正・RealtimeとTypeSafeの分担
+
+- ユーザー評価「やかましい」「軽くシームレスに」を受け、3案の飛行機・波紋・扇状展開を実際の操作部品から外した。比較案と動画は不採用の検討履歴として残す。
+- PCは通常のCSSで開く180ms／閉じる120ms、最大8pxの移動と透明度だけ。毎フレームのReact更新と動きの選択欄を削除。XRも同じ時間・最大8pxで盤全体を開閉し、項目の回転・時間差表示は使わない。日本語、アイコン、色、余白で世界観と分かりやすさを保つ。
+- Realtimeのfunction tool、サーバー側制御、GPT-Liveのclient delegationとTypeSafeの公式仕様を調査。会話の窓口／有限の選択・評価／数値計算と飛行を分担する案をdocs/typesafe-ai.mdへ追記。機体・音・航路の相談、仮想パイロット・管制官の役、古い提案の破棄、比較実測の条件を記録。これらのAI操作は未実装。
+- 検証：型検査、129ユニット、ビルド合格。PC操作と模擬Quest 3／2の4群、手入力2群も合格。連打・外側／Escapeで閉じる・フォーカス復帰・閉じた項目の無効化・動きを減らす設定・飛行継続・AR往復・ピンチ／タッチを確認。指定WEB_GAME_CLIENTの画像と状態も確認した。
+- 今回の実装先はローカルの ?ui=components。公開版への反映・実API利用・Quest実機での新しい動きの受入は未実施。既存のバンドルサイズ警告は継続。位置合わせT1〜T4は0/4のまま。
+
+## 2026-09-18 動き第2稿・60fps映像・TypeSafe接続口
+
+- ユーザー指摘を受け、前回の3案は見た目の差が弱く、実画面録画のフレーム進行も不足していたと整理。前回の操作テスト成功を演出品質の成功とは扱わない。
+- 翼のように畳まれた項目が浮く／旅客機と航跡が横切る／遅れて音の輪が広がる3案へ変更。純粋な時刻→姿勢の関数をDOM・XR Canvas・動画で共有。開く1.65秒、閉じる0.65秒は強めの比較値。カメラ移動は加えない。
+- ?ui=motionに軽量な動作模型、PC／VR切替、コマ送り、明示したときだけ音付き再生を追加。?ui=componentsの実際の操作部品も更新。同じ案を押して再演、途中反転、reduced motionを維持。XRは動く項目の押下を開き切るまで受け付けない。
+- Remotion 4.0.526をmotion-filmへ分離導入。6本のMP4を1280×720・60fps・540フレームで出力。VRは手と操作盤の関係を描いた動作模型で、Questの実機映像ではない。自作の低い風音を比較用に合成。模型も音も既存のエンジン音の置き換えではない。
+- docs/concepts/2026-09-18-motion-v2/review-board.htmlへ同時再生・半速・大画面再生を用意。全動画をデコードして60fps・映像9秒・音声を検証。各動画の開く途中の操作盤97フレームは97種類。全6画像、PC/VR/モバイルの比較ページ、実際のメニューのスクリーンショットを確認。Playwrightで同時再生の時間差0.2秒未満、半速、選択動画の再生、390px幅を確認。
+- TypeSafeのIntroduction/API/Models/公式Agent Skill/提供元発表を確認。Jevは有限の選択や評価向け。音声認識や生成会話の代替ではない。入力100万トークン$0.042、公称70〜500msは提供元の情報で日本からの実測ではない。
+- AI接続口は端末内の音量等5操作＋該当なし。固定モデル、返却値検証、暫定信頼閾値、古い状態の破棄、1.5秒タイムアウト、再試行なし。結果は操作候補までで自動実行しない。公開APIルートやマイクは追加せず、APIキー未設定・実API呼び出し0回。CLIの通信なしプレビューと模擬試験を実行。
+- 検証：全129ユニット、アプリbuild、WorkerのTypeScript、Remotion lint/tsc合格。PC＋Quest 3/2の操作4群、手入力2群、比較画面の再生・シーク・減速・音開始停止を確認。WEB_GAME_CLIENTでも実際の空でメニュー開状態を確認。
+- 途中の検証不備を修正：コマ送りの小数stepを整数フレームへ変更、WorkerのclearTimeout型を修正、検査用FFmpegを同梱対応のimage2pipeへ変更。フォーマット時のVite HMRにより操作テスト1回が中断したため、編集を止めて再実行し4群合格。従来の500kB超バンドル警告は継続。
+- 公開・commit・pushはしていない。ローカル成果物4/4、演出の好みとQuest実機確認0/2。位置合わせT1〜T4は0/4のまま。詳細はdocs/motion-v2.mdとdocs/typesafe-ai.md。
+
+## 2026-09-17 動き3案・手操作・VR／AR一人称の画面案
+
+- 来場者は手・指を基本にし、声へ拡張する方針をdocs/hand-and-motion.mdへ整理。コントローラーは制作／代替入力。音声・AIは設計のみ、マイクや有料APIには接続していない。
+- ?ui=componentsへ「浮上／航跡／音の波」のCSS開閉比較を追加。同じ操作定義、日本語、動きを減らす設定を維持。XR側は従来の控えめなアニメーションを使う。
+- ローカルXR試作だけで任意のhand-trackingを要求。遠方ピンチ、手前62cm・幅72cmの世界固定操作面、指先の直接タッチ、接点表示、手向け操作案内を追加。関節マーカーは簡易表示で、生成画像の自然な手メッシュとは異なる。
+- DirectTouchGateで前方からの接近・離して再押下・背面と横滑り・追跡喪失・ピンチ重複を制御。両機種のIWERでピンチ→聴き方→タッチ→保持→離して再押下→手再検出→AR→コントローラーへの復帰を確認。実機の精度・疲れ・性能の完了とは扱わない。
+- Creative Productionの画像複数制作手順に従い、既存の画像担当2つへ生成だけを委任。builtin ImageGenのVRピンチ案／ARタッチ案2枚と正確なプロンプトをdocs/concepts/2026-09-17-hand-controlsへ保存。白い4発旅客機、深緑、アイボリーを引き継ぐ。根元でも画像確認済み。VRの指はピンチ成立前、ARは架空の会場。
+- Playwrightで約12.8／14.12／14.36秒の実装動画を録画。途中の目視で、アニメーション中のボタンへのフォーカスがoverflow:hiddenの親をスクロールさせる問題を発見。focusのpreventScrollと親のoverflow:clipで修正し、親scrollTop=0を確認して再収録。削除したのは今回の古い録画と画像6ファイルだけ。
+- 共通review_rendererで動画のサムネイル3枚と構想画像2枚を比較できるページを作成。全5画像・動画メタデータ・実際の再生・PC／390px幅の表示・3案のreduced-motionを確認。画像と再生フレームを目視した。静的サーバーではシーク直後に先頭の白画面へ戻ることがあったため、実再生7秒でも追加確認し正常。録画は無音のPC画面で、実機の性能証明ではない。
+- ユニット122件とビルド合格。操作部品の既存PC＋IWER両機種4群、新規手入力の両機種2群で例外なし。WEB_GAME_CLIENTでもメニュー開状態と画像を確認。既存のバンドルサイズ警告とスキル側module-type警告は継続。
+- 最終の従来VR回帰24項目も合格（output/vr-hands-regression）。コントローラー、中心頭部の耳、3機同時波形、選択解除、音量、周回、退出・再入場を維持した。
+- 手だけで視界外の操作盤を呼ぶジェスチャー、音声接続、共有版への適用は次工程。机のT1〜T4は0/4のまま。今回の試作は保存済み設定と部屋APIへ非干渉。公開配置・版番号変更・commit/pushはしていない。
+- PC試作は5173、動画と画面案は4893/review-board.htmlで起動。以前の比較ページ4892も維持。次は動きの好み→Quest単体の手操作実測→Quest 3＋2の校正／別視点確認→共有版への適用。
+
+## 2026-09-17 バーと開閉メニューの操作部品を試作
+
+- ユーザーの「フオンと開く／選ぶ／引っ込む」「アイコンと日本語」「部品を組み合わせてAI案内へつなぐ」を受け、別入口`?ui=components`でローカル試作を追加。通常の単体・共有画面の一括変更は行わない。
+- `ui/control-menu.ts`へ操作ID・表示文・説明・アイコン・可否・端末内の影響範囲を定義。PCのControlDockとXRのSpatialControlMenuで同じ定義を使う。VrRuntimeへ任意の操作面を接続する小さな拡張を追加。
+- 開く約240ms／閉じる約180ms、連打の反転、閉じたボタンの無効化、Escと外側クリック、キーボードのフォーカス復帰、動きを減らす設定を追加。XRは空間に固定、グリップで呼び戻す。効果音と外部AIは未追加。
+- docs/control-components.mdに試し方、部品構成、AIの「案内→ボタンを示す→操作支援」の段階を記録。操作面が同じでも共有操作の権限まで同一にはしない。今回の試作は保存済み設定・部屋APIと独立。
+- 新規3件を含むユニット119件とビルドが合格。新しいブラウザ検証でPCの音量・音・フォーカス・連打・モバイル・保存状態非干渉、IWERのQuest 3／2でトリガー・開閉・音量・AR往復・グリップ・不可視ボタン・退出・再入場を確認。例外なし。
+- 新規XRテストの再入場時に「開いたまま」とした前提が失敗。入場ボタンへの外側クリックでメニューが閉じる実際の流れに合わせ、再入場後にバーから開く試験へ修正して両機種が通過。
+- 画像確認で案内文の重なりを修正。開き切ったPC画面・スマホ幅・両眼の操作盤を目視確認した。出発準備中・音の到来待ちを「飛行中」とまとめないよう表示文を調整。
+- 指定WEB_GAME_CLIENTで開始操作とFLY状態・閉じたバーを確認。通常のPCページ全体の飛行中画像も追加で確認し、コンソールエラーなし。出力はoutput/control-components。共有スキルの既存module type警告と既存JSチャンクサイズ警告は継続。
+- 既存の単体VR回帰24項目が合格（output/vr-controls-regression）。従来の選択・音・3機同時出力・聴き方・周回・再入場・退出を確認。最終ビルドも合格。試作用Viteを5173で起動し、PCで触れる入口を開いた。
+- 公開環境への配置、Quest実機確認、背景のフェード演出、既存共有版への部品適用は未実施。版番号はv0.11.0を維持する。
+
+## 2026-09-17 入口・VR／AR切り替えの画像構想
+
+- ユーザーの「先にやることではない」発想として、入口とVR／ARの継ぎ目、旅客機・音を感じる意匠をidea-notes.mdへ記録。位置合わせ・会場の基礎の優先順位は維持。
+- 現行の配色・機体・既存キャプチャを参照し、ImageGenで入口、空の観察、VR／AR切り替え途中、会場の地図の4画像を制作。観察案の機首前の不要な線を編集した。画像とプロンプトをdocs/concepts/2026-09-17-transitionsへ保存。
+- docs/visual-transitions.mdへ推奨方向、動き・音・日本語、現行コードとの接点、後日の実機確認を整理。架空の部屋・会場図、異なる機体ポーズの静止画を、実装や連続フレームの証拠として扱わない。
+- 共通rendererの比較ページを作成。ブラウザで4画像の読み込みとリンク、PC幅1000px・スマホ幅390pxで横にはみ出さないことを確認し、両方の画像を目視確認。ページのfavicon未配置による404のみ。CLIの複数行引数は構文エラーになったためファイル指定へ変更して検証を完了した。静止画の確認であり、XRの動作検証ではない。
+- 今回は構想資料。アプリコード、版番号、公開環境は変更していない。
+
 ## 2026-09-17 v0.11.0 体験の再設計と縮小配置図
 
 - 元の青写真と現行コードを照合。「地上で旅客機を見上げ、遅れて届く音を待つ」を維持。仮想の空／展示会場／将来の空港 × VR／ARの6通りを整理し、まず仮想と会場の4通りを優先。開発6段階・完成率とは分ける。
@@ -350,3 +591,158 @@ Original prompt: 空repo https://github.com/toM7x7/airplanevoice — 資料を�
 - `npm run preview`、http://127.0.0.1:4173 で配布版を確認。
 - 今後の候補は短いフライバイ、音航跡へのフォーカス、空への直接描画、機体・音の品質向上。docs/source-analysis.mdとdocs/development.mdを参照。
 - XRiftの要件や制約を再導入しない。独立Webサービスというユーザーの明示方針を維持。
+
+## 2026-09-21 Headroom, authored sound and shared hangar
+
+User correction: flight physics stays lightweight; audio engine quality remains a priority. Implemented overhead route preparation, three sound parameters, local named aircraft+route+sound storage/import/export, room hangar (24 entries), three-aircraft batches and exhibition rotation, shared playback of each recipe, and Quest operator hangar controls. Existing worktree preserved.
+
+Verification: 176 tests passed, worker types/build passed; audio-output-check four conditions passed with all three voices and mute/resume; hangar-check six browser checks passed with two independent pages and reload. Actual screenshots inspected (shelf and aircraft view); skill Playwright client completed. No paid AI calls.
+
+Release pending: CLI account differs from configured 754acbe167d743ab44593f5f828f42ee. Asked user to restore auth; no deployment attempted. Actual Quest 3 perception/performance remains unverified. Local worker 8787 and Vite5173 running.
+
+最終確認: 既存共有ブラウザテスト10項目も成功。公開はユーザー指定で、認証切替後の追加指示まで保留。ローカルビルド 70f3db7b69fb7b73。
+
+## 2026-09-22 ローカル再開と工程整理
+
+停止していた8787共有版と5173開発版を起動。公開・認証変更なし。本人がまず既存機能を試す段階。docs/local-completion-plan.mdへ単体制作・出発帰還→会場案内→実フライト＋Jevの順番と受入条件を記録。帰還命令と途中航路変更は未実装と明記。
+
+## 2026-09-22 PC／VR制作ループと部屋への作品提出
+
+- User authorized implementation after agreeing PC detailed/manual authoring, VR guided creation and recall, and AR observation. Same user does not simultaneously edit PC and Quest. Existing dirty worktree preserved; no commit, deploy or auth changes.
+- Added common creation actions and persisted browser draft with bounded undo; shape/sound/name/launch steps, 2-second sound audition, PC dimension/sound sliders, local save and paginated VR recall. Miniature preview uses a separate 0.009 scale; full-scale flight/audio coordinates unchanged. Added lightweight hangar/apron/runway scenery, hidden with other landscape in AR.
+- `create-entry` submits an immutable work to the room without flying. `create-flight` snapshots that work and queues a named flight. Both accept participant submissions, enforce checked recipes/revision/limits, ignore supplied IDs for ownership, and preserve operator draft and exhibition source. Existing operator-only operations remain protected. Same unchanged name/recipe deduplicates; persistence precedes broadcast. Browser shelf and room shelf are labelled separately.
+- Assistant creation tools reuse the button actions. Guide reveals the correct step and highlights the button in DOM and XR. Apply changes reversible draft choices; save/share/fly are guide-only pending physical confirmation. Context includes creation name/step/dirty state and validated aircraft settings. Jev creation judgments, permanent ownership and real-microphone onboarding remain future work.
+- Voice component stays mounted through XR entry; VR voice page exposes start/end/mute for a browser-prepared connection. No paid AI calls in verification; mock API exercises the real app action adapter and confirms the audio DOM element is preserved.
+- Fixed a pre-existing server departure bug found in logs: echoing reserved close code 1005 threw before broadcasting peer departure. Current compatibility date automatically replies to Close frames, so removed the redundant close and added a regression test.
+- Verification: **182 unit tests**, Worker types, build; **8 creation checks**, **10 shared checks**, **6 hangar checks**, **8 exhibition checks** passed. Screenshots and text states inspected. Skill browser client ran on the new creation entry. Build **27b7d656d43219da**, served by local8787 with HTTP200/current asset verified. Unit test includes immutable submissions, undo/storage, guide-vs-final-decision, and the close callback.
+- Earlier browser retries included a stale test selector, a frame-order assertion before highlighting completed, and a room-connection timeout under concurrent local runs. Corrected test selectors/timing, ran shared/exhibition checks with a separate local runtime at8788; final recorded runs passed. Temporary8788 runtime stopped; user8787 and5173 left running.
+- Remaining: real Quest3 hand/voice/readability/performance acceptance; ground movement/takeoff/return/landing; live sound edits; persistent cloud asset ownership and backups. Updated docs/creation-experience.md and local-completion-plan.md. Publication remains on hold until the user switches Cloudflare authentication and gives follow-up instructions.
+
+## 2026-09-22 開発再開：制作メニューの階層
+
+- PV制作からアプリ開発へ復帰。公開・Cloudflare認証変更は保留を維持。
+- 原因：SharedControlSurfaceがページ指定座標を捨て、すべての操作を同じグリッドへ並べ直していた。制作ページだけ明示配置を尊重するよう修正。他のページは既存配置を維持。
+- VR制作の中央に候補、下に戻る／次へ（最後は飛ばす）、最下段に取消／閉じる。現在手順をタイトルに追加。主要操作は濃色、AI案内の強調は別表示。最初の手順の戻るは無効。
+- VRの名前段階に「キーボードで名前を入力」を追加。VRを終了し、既存下書きを維持してブラウザ入力欄を表示・フォーカスする。音声入力不要。Quest日本語キーボード表示・再入場は実機未検証。
+- 検証：型チェック、ビルド成功。関連単体6件、既存制作ブラウザ8項目成功（実API課金なし）。疑似XRの配置画像を目視。develop-web-gameクライアント実行と画像確認済み。大きいJSチャンクの既存警告あり。
+- 次：キーボードから名前確定→VR復帰の実機確認、Quest入口、同条件の音色A/B比較。続いて出発・帰還。名前キーボードの新導線そのもののE2Eは未検証。
+
+## 2026-09-22 ローカル接続とVR入口・音比較
+
+- 5173/8787は起動済み、8787 HTTP200。Quest USB接続後ADBで認識し、tcp:8787 reverseを設定。Questブラウザ自動起動は実行ポリシーで拒否されたため手動でURLを開くよう案内。公開・認証変更なし。
+- VR対応ブラウザの入場ボタンを制作メニューより上に移動。ブラウザへ戻っても下書きを引き継ぐ説明を追加。
+- 音選択に「基準 → 今の音を比較」を追加。標準音2秒、無音0.35秒、現在音2秒を同じ合成条件・音量・包絡で再生。元の音色エンジンは変更なし。空間音響の通過比較ではなく、手元の音色比較。
+- 検証：型チェック／ビルド、関連単体6件、制作ブラウザ8項目合格。Web Audioバッファ検証で4.35秒、両区間の非無音、無音区間、再試聴時の置換・停止を確認。出力RMS .15277/.15281。これはQuestでの聴感差を保証しない。
+- ローカル8787から最新版 index-Cd19AyBc.js 配信を確認。ビルド3fc9aee428ee8e52。スキルクライアントと制作画面の画像確認。Questの実機評価はユーザー試遊待ち。
+
+## 2026-09-22 原点と音エンジンの見直し
+
+ユーザー実機評価：3候補の音が同じに聞こえる。名前入力からのVR復帰も困難、VR内入力希望。模型は手元操作できず、メニュー複雑。原本DOCXを再読し docs/core-quality-reset.md に工程を再整理。
+
+音を独立した胴鳴り・ファン倍音・気流から合成し、候補の混合差を拡大。形式互換は維持、既存保存音色も新合成になる。既存ヒス抑制テストを初回失敗したため、空気設定に応じた平滑化を追加して改善。既存・追加10テスト合格。ビルド e6770f88787e7aac。ブラウザの比較バッファ4.35秒／無音／置換停止検査成功。これはQuest聴感合格ではない。VR内キーボード、模型つかみ・色選択、雲条件は未実装の次工程として明記。公開なし。
+
+## 2026-09-22 深い旅客機音を標準へ
+
+本人評価で、音色差を広げた候補は旅客機らしさを失った。深い響きを標準に変更し、候補差はファン・気流の小さな配合差へ縮小。音源の高さや回転数を実測再現したものではない。距離減衰・過去の発音位置から到来する処理は変更していない。既存保存設定は保持するため、試遊では標準音を選び直す。
+
+VRから第2/第3音色候補・比較・共有・Undoを除き、標準音の選択／試聴と進行へ簡素化。PCの詳細調整は維持。飛行時には既存の共通処理で部屋登録される。VR内キーボードと模型操作は後続。ARで眺める既存導線を維持し、新規の実機AR検証は未実施。
+
+関連15テストとビルド成功、ローカル8787に index-DhG0uW7b.js 配信確認。ビルドa1c3eae613ba9a03。制作ブラウザ検査は当初、旧候補のbody値変化を待つ条件が既に成立して先走ったため失敗。新候補でも実際に変わるair値を待つよう修正。公開なし。
+追加検証：飛行・到来のコア18テスト合格。制作ブラウザの再実行でVR入場・飛行・格納庫再呼出しまで成功し、簡素化したVR画面を目視確認。
+
+## 2026-09-22 VR制作・AR観察・PC編集のまとめ対応
+
+- ユーザーの「方針対応まで一気に」を受け、VR内命名、模型操作、尾翼色、AR観察導線をまとめてローカル実装。既存dirty worktreeを保持。公開・認証変更・有料AI呼出しなし。
+- 空間キーボード：かな／カナ／大文字英数字、濁点・半濁点・小文字、削除・全消、確定・取消。確定まで名前は変更せず、XRセッションを終了しない。漢字変換はPCに残す。
+- 模型：メニュー基準で手元へ配置、つまみ／トリガー保持で移動・回転、ボタンで回転・拡縮・呼び戻し・リセット。追跡喪失、切断、終了で保持解除。PCでは実際の模型ドラッグも実装。模型だけの変形で実寸飛行や音響座標は変えない。初期向きは機首を観察者側へ。
+- 名前入力中は模型を非表示にし、重なりを避ける。通常時も模型をメニューより上に配置。尾翼色3種は検証付き任意colorフィールドとして既存レシピ形式と後方互換で保存・共有・飛行へ引継ぎ。形変更でも色を保持。
+- 最終画面に「ARで眺める」。対応するimmersive-arセッションでのみ有効、同じ飛行を保って制作画面を閉じる。
+- 検証：全188単体テスト、Worker型、ビルド成功。拡張制作ブラウザ11項目（VR内命名確定/取消、模型保持/移動/回転ボタン/拡縮、色と名前の共有、AR切替、再呼出しを含む）成功。最終の配置修正後は専用XRレイアウト検査とPCドラッグ検査を再実行し成功。各スクリーンショットを目視。skill Playwrightクライアント実行・画像確認。大きいJSチャンクの既存警告あり。
+- 検証途中：HMR更新が疑似XRセッションへ干渉したため配布ビルドへ切替。またビルド直後の初回ブラウザ読込が数回タイムアウトした。原因は未確定。改めて同じ配布ビルドを開き直して通常画面と専用検査の成功を確認した。これをアプリのE2E成功と混同せず記録。
+- 最終ビルド bcee9eca830ad4b2、8787から index-BeBHiiSI.js 配信確認。Quest USBとtcp:8787転送は有効。実機での日本語キー視認性・指タッチ／つまみ感・ARでの見え方は未評価。
+- まとめ確認は docs/vr-creation-review.md。離発着・途中帰還、漢字IME、気象条件付き飛行機雲、恒久クラウド格納庫は後続。
+
+
+## 2026-09-22 VR操作フィードバック修正
+
+- ユーザー報告: つかみ位置の違和感、尾翼色の発見性、AR後の戻り方、模型の一発呼び出し、飛行ボタン無効、20機の一覧。
+- SharedApp: 部屋未作成でも飛ばすから自動接続して確定済みentryを送信。受付中の重複防止、次便待ち秒数、再接続理由を制作画面に表示。既存部屋の同期・予約制は維持。
+- VrRuntime: 未キャリブレーションでも部屋変更でlostになり世界を隠していた条件を修正。配置済みの基準変更時は失効する。
+- CreationPanel: 形左／尾翼色右、選択✓、制作下部のVR/AR切替。shared-panel: メイン切替・AR手元模型呼び出し、運営機能は見え方のページから到達。
+- Airfield: 大きな球判定を実モデルのraycastに変更。保持offsetも回転させ、回転時のつかみ位置を維持。
+- 格納庫: 同名同設定重複を統合、通番・ページ番号。4機ずつ20機を確認。20機同時飛行は対象外。
+- 検証: 189 tests pass、build e202b40508d35fc2。creation-navigation-checkが部屋未作成VR飛行→AR/VR→AR模型呼出→grab/move/release→20機ページ/呼出を成功。初回検証は部屋変更によるlostを検出し修正後成功。skill browser client実行・画像目視済み。
+- 公開保留、ローカル8787のみ更新。USB Quest3とreverse8787確認。実機の握り感・指入力・AR背景はユーザー確認待ち。
+
+- 追加検証: 同一ローカルIPで新規部屋を繰り返し作ったため、既存の4部屋/10分作成上限で再実行が失敗。画面のエラー表示・pending解除は確認。開発者テストは別ポート8788・専用永続領域へ隔離し、最終ページの次ボタン無効と前ページ復帰も含め再検証成功。利用中の部屋・DBは削除していない。PC模型drag/colorチェックも成功。
+
+
+## 2026-09-22 Cloudflare公開保留解除・検証と反映
+
+- ユーザーが認証切替とアップロードを明示依頼。OAuth承認後、元のAccount 754acbe167d743ab44593f5f828f42eeへのアクセス確認。
+- 189 tests・Worker types・build・dry-run成功。ローカル8788の専用永続領域で共有制作11項目とVRナビゲーション/20機一覧を検証。
+- `wrangler deploy --keep-vars`成功。Version 8e2a8d1d-436b-4a76-b8b8-cba2ae3e6133、bundle e202b40508d35fc2。公開index/sw照合、health ready。
+- 公開環境PC＋模擬Questで11項目通過、page errorsなし。AI fixtureのみ、有料providerなし。証拠 output/release-20260922。
+- 検証出力をCREATION_OUTPUTで分離可能にし、ローカル証拠の上書きを回避。docsに公開記録と最新状況を追記。過去の保留は履歴として維持。
+- Quest実機の操作感・音の聴感はユーザー検証が必要。恒久保管・20機同時飛行・離着陸は今回追加なし。
+
+
+## 2026-09-22 PC画面フローの再設計提案
+
+- ユーザーはPC版の混雑改善を先に選定し、会場マップ連携へ移る方針。VR/ARでのGPT-Live・Jev入口をコード確認。
+- GPT-Liveはブラウザ準備後XRメニューから開始/終了可能、Jev観察トグルはブラウザのみ。常時視界画像認識は未実装。
+- docs/pc-xr-flow-proposal.mdに日本語の分類、画面フロー、現状/提案の境界、会場版へ移る条件を整理。
+- Product Designで独立した3つのUI画像案を生成、docs/concepts/2026-09-22-pc-flow/01.png〜03.pngへコピー。画像の写実表現は提案で現行描画ではない。選定待ち、本番コード変更/再公開なし。
+
+
+## 2026-09-22 選定方向をPC/VR/ARへ展開
+
+- ユーザー: 1の空港/格納庫背景を土台に2の編集メニューを採用。空に映える姿を比較したい。Questは入場後XR内で完結、PCも独立した来場者体験。
+- 統合PC編集、VR機体選択、AR制作/AIの3画像を生成し docs/concepts/2026-09-22-unified に保存。
+- docs/unified-experience-direction.mdに画面マップ、背景比較のローカル状態、機体選択/飛行/注目の区別、AI入口と現状ギャップ、実装順を整理。旧仕様に今回の優先変更を追記。
+- 本番実装/公開変更なし。画像は見え方の目標で実装証拠ではない。
+
+2026-09-22 XR editing rework:
+- Direct fingertip midpoint grips on aircraft parts with 4.5cm padding and 180ms contact retention. Menu header dragging in controllers/hands; centred model and side panel.
+- XR shape/colour/sound/name/AI tabs, always-visible fly/exit, new aircraft and library home. AI remains mounted while editing. Distinguish pending commands from reconnecting, bound initial WS snapshot to 12s and offer XR recovery.
+- New participant flights have a shared-time 33s runway/climb segment; new auto-created 8h rooms repeat the hangar. PC can edit against actual live flight. Quiet procedural UI sounds and optional wind.
+- Public entry https://airplanevoice.pages.dev/ proxies API and WS to the same Worker. Old origin remains usable, saved library export/import provided. Worker 3ed81baa-388c-416a-92bc-92ac6347bc59 / bundle a6bebaf05d4d9be5 / Pages7affe8f2.
+- Unit196 passed, Worker typecheck/build/dry-run passed. Public PC and fixture-AI XR flows passed; IWER finger/menu grips and synthesized sound signals checked. output/xr-rework holds evidence. Paid providers not called. Real Quest grip feel, mic and audio perception remain device acceptance.
+- User's next quality priority: make the delayed heavy sound feel tangible through its trail, weight and shape before venue-map work. Recorded in docs/idea-notes.md; not claimed implemented.
+
+## 2026-09-23 出発待ち・重なり・AI公開準備・風防
+
+- 最新要望: 15秒程度で次機出発、飛行を長めに、飛行機体一覧、キー入力なしのAI準備、機首風防の向き、保存機体の呼び出し・再編集。
+- 実装: 3枠を守った重複飛行、利用者出発は2周、共有時刻の複数機再生、既存機の音キュー保持。PC/VR一覧、PC保存機体ドロップダウン、前方向の風防。
+- AI公開デモは明示設定で有効化、秘密鍵非公開。各クライアントで状態を分離。準備だけ自動、会話/観察は操作開始。
+- Unit199件通過。PCテストでドロップダウン追加後のモバイル横溢れを検出し修正、再試験成功。
+- 詳細: docs/flight-and-ai-update-2026-09-23.md。公開反映と模擬XR等の結果は後記。
+
+- 最終ローカル検証: Unit199/36files、Worker型検査、build、dry-run通過。模擬XR14項目、PC10項目、2機重複/15秒出発/保存呼び出しのブラウザ検証成功。
+- 検証中の失敗: 本来の部屋作成回数制限に到達したため専用ローカルDBに切替。ビルド後のWrangler asset manifestが古く404になり、テスト用8789サーバーだけ再起動。製品制限を緩めて回避はしていない。
+- Worker公開: 26595dc0-62f0-4e00-92e5-277fd7616beb。Pages: ec625f62。bundle: dbb982cb9858f406 / index-CBsbP747.js。
+- 実Quest、実マイクでのGPTライブ、有料Jev出力は未検証。fixtureでAI操作と画面連携を検証。
+- 公開後: airplanevoice.pages.dev の最新JS配信を検証。入場キーなし・2つの独立ブラウザのAI準備・両プロバイダー鍵設定を確認。有料API呼び出しなし。公開画面で15秒後出発/2機同時/名前一覧/保存機体ドロップダウン再編集も通過。
+- 証拠: output/2026-09-23/public、overlap、xr、workbench。ローカル8787のHTTP200も確認。
+
+
+## 2026-09-23 共通展示空間・クラウド格納庫
+
+- 通常URLを固定Durable Objectへ自動接続。新規固定空間は永続、アラームで自動飛行。個別部屋/招待/閲覧権限は継続。
+- PC/VRの保存をクラウドへ統一。端末内機体の移行、保存ack待ち、競合拒否、クラウド一覧と再編集、QR共通入口、ファイルバックアップを実装。
+- Unit205/38、Worker型検査/ビルド/dry-run通過。ローカルPC+IWER7項目、従来private招待XR14項目、公開Pages4項目通過。AI有料呼び出しなし。
+- Public smokeは一意の確認機体だけを作成・除去し、再読込後の保存を確認。実機検証ではない。
+- Worker38b4e000-8aaa-45bf-a3d1-ae4e19cc3dc2、Pagesee73608b、bundle17d28727b0bff4f9。詳細docs/cloud-exhibition-2026-09-23.md。
+- 4接続/24保存機/3同時飛行を維持。公開共同格納庫であり所有者別認証は未追加。表示と音は端末計算、共通座標は手動位置合わせと別。
+
+## 2026-09-23 VRメニュー固定・名前で操作するAI
+
+- 自動で盤が動く原因：入力元の手/コントローラー切替と模型表示有無でpanelPlacedを解除していた。これを廃止し、左右の取っ手を追加。ボタン/見出しは掴み領域から除外。手squeezeによる呼び戻しを除外、追跡復帰時に開いた指を要求。
+- 模擬操作で追加再現：180msの接触保持が、離れた場所での再ピンチを誤グラブにした。現在位置と接触位置の4.5cm条件を追加。修正後5項目成功。
+- AIへ格納庫の実ID/ユーザー名、下書きID、飛行枠と名前の対応、PC/VR/ARの画面項目、未保存切替/出発可否を渡す。共通定義からメニューと制作選択肢をJSON生成。hangar load / menu移動を実装。本人の保存/出発確定を維持し、未保存切替中の別AI操作を拒否。
+- XRの案内判定は非表示DOMに依存せず、実際の盤/強調ボタンを確認。開く操作は盤を置き直さない。
+- Unit210/40files、型検査、build、dry-run通過。PC+IWER16項目（名前付きツール応答、未保存保護、音編集、出発強調、実際の離陸後も盤固定）。掴み5項目、skill browser client実行/画面確認。
+- 最終ビルドで掴み5項目、関連27テストを再確認。公開Pagesでも5項目、最新アセット/AI準備設定を確認。AIはfixtureであり有料呼び出しなし。実Questと実音声会話の受入は別。
+- Worker7aa4e3bc-b735-4d26-8f0b-3a6835b76d18 / Pages5909e12e / bundle9247584f8d44f688。
+- 証拠 output/menu-voice-2026-09-23/{creation,grab,skill,public}。仕様 docs/menu-and-voice-2026-09-23.md。
+- 2026-09-23 機体案の部分採用・景色相談：Jevの質問別指示と部分採用を修正。景色パネルに文字入力・名前・任意の建物遮蔽音を追加。255テスト、型検査、ビルド、ローカル2端末UI、実WebAudio、公開AI2回を確認。公開の追加共有接続は4接続上限の429で未確認。詳細 docs/consultation-fix-2026-09-23.md。

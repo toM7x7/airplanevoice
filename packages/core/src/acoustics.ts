@@ -49,14 +49,23 @@ export function createEmissions(
 // emissions remain consumed even if the listener moves or the clock advances.
 export class ArrivalQueue {
   private consumed = new Set<number>();
+  // Emissions are in emit order and every emitted sound eventually arrives, so skip the consumed prefix.
+  private cursor = 0;
   constructor(
     readonly emissions: SoundEmission[],
     readonly delayScale: number,
   ) {}
   advance(nowMs: number, listener: Vec3): SoundArrival[] {
     const arrived: SoundArrival[] = [];
-    for (const emission of this.emissions) {
-      if (this.consumed.has(emission.id) || emission.emitAtMs > nowMs) continue;
+    while (
+      this.cursor < this.emissions.length &&
+      this.consumed.has(this.emissions[this.cursor].id)
+    )
+      this.cursor++;
+    for (let i = this.cursor; i < this.emissions.length; i++) {
+      const emission = this.emissions[i];
+      if (emission.emitAtMs > nowMs) break;
+      if (this.consumed.has(emission.id)) continue;
       const arrival = arrivalFor(emission, listener, this.delayScale);
       if (arrival.arrivalAtMs <= nowMs) {
         arrived.push(arrival);
@@ -67,5 +76,10 @@ export class ArrivalQueue {
   }
   get remaining(): number {
     return this.emissions.length - this.consumed.size;
+  }
+  /** Keep emitted/pending sound at its original position while replacing future motion. */
+  replaceFuture(emissions: SoundEmission[], nowMs: number) {
+    for(let i=0;i<this.emissions.length;i++)
+      if(this.emissions[i].emitAtMs>nowMs && !this.consumed.has(this.emissions[i].id) && emissions[i]) this.emissions[i]=emissions[i];
   }
 }

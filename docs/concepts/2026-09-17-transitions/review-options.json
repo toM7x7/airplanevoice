@@ -1,0 +1,8 @@
+{
+  "preset": "moodboard",
+  "title": "AIRPLANEVOICE — 入口とVR／ARの画面案（構想）",
+  "showCaptions": true,
+  "showControls": false,
+  "minTileWidth": 320,
+  "output": "review-board.html"
+}

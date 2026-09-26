@@ -1,0 +1,4 @@
+import {AbsoluteFill, Interactive, interpolate, useCurrentFrame} from 'remotion';
+export const Frame: React.FC<{children:React.ReactNode; dark?:boolean}> = ({children,dark=false}) => <AbsoluteFill style={{background:dark?'#102e35':'#f4f1e8',color:dark?'#f4f1e8':'#163e45',fontFamily:'Yu Gothic, Meiryo, sans-serif'}}>{children}</AbsoluteFill>;
+export const Label: React.FC<{children:React.ReactNode;dark?:boolean}>=({children,dark=false})=><div style={{position:'absolute',top:48,left:72,fontSize:25,letterSpacing:3,color:dark?'#c1d4d1':'#476b6c'}}>{children}</div>;
+export const Reveal: React.FC<{children:React.ReactNode}>=({children})=>{const frame=useCurrentFrame();return <Interactive.Div name="見出し" style={{opacity:interpolate(frame,[0,14],[0,1],{extrapolateRight:'clamp'}),translate:interpolate(frame,[0,18],['0px 15px','0px 0px'],{extrapolateRight:'clamp'})}}>{children}</Interactive.Div>};

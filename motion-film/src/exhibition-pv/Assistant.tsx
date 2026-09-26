@@ -1,0 +1,3 @@
+import {Brand,Frame,Heading,Screen} from './Frame';
+export const Assistant=()=> <Frame><Brand label="02 / AIと相談する"/><Heading>「こうしたい」を、形にする。</Heading><Screen name="ai" note="AI操作の再現映像：応答は固定。下書きへの反映は実際のアプリ処理です。"/>
+ <div style={{position:'absolute',left:1415,top:335,width:435,fontSize:30,lineHeight:1.8}}><strong style={{fontSize:40,color:'#e6cf99'}}>GPT-Live</strong><div>対話による操作案内・<br/>設定の変更を支援</div><div style={{height:40}}/><strong style={{fontSize:40,color:'#e6cf99'}}>Jev / Typesafe</strong><div>機体の下書き・<br/>空の状況の判断を支援</div><div style={{marginTop:44,fontSize:27,color:'#c1d4d1'}}>保存・共有・出発は、<br/>自分で決めます。</div></div></Frame>;

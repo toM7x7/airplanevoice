@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { FlightRadarSurface, type RadarSource } from "./FlightRadar";
 import {
   aircraftInfo,
   type Experience,
@@ -6,8 +7,25 @@ import {
   type Vec3,
 } from "../../../packages/core/src";
 import type { AircraftAudio } from "./audio";
+import type { SpatialControlSurface } from "./ui/spatial-control-surface";
+import { SharedControlSurface } from "./ui/shared-control-surface";
+import { SpatialHandInput } from "./ui/spatial-hand-input";
+import { SpatialGrab } from "./ui/spatial-grab";
+import {
+  createPanelHandles,
+  nearPanelHandle,
+  highlightPanelHandles,
+  PANEL_HANDLES,
+} from "./ui/panel-handles";
 import {
   DEFAULT_TABLE,
+  tableDepth,
+  tableInFront,
+  placementAlignment,
+  moveTable,
+  type TablePlacement,
+  checkAlignment,
+  type AlignmentCheck,
   solveAlignment,
   type Alignment,
   type TableFrame,
@@ -16,13 +34,18 @@ import {
 type VrStatus =
   "checking" | "unsupported" | "ready" | "entering" | "presenting";
 export interface SharedVrPanel {
+  environment?: { label: string; enabled: boolean; press: () => void };
+  layout?: "authored";
   hint?: string;
   lines?: string[];
   title: string;
   status: string;
   detail: string;
+  guided?: boolean;
   buttons: {
     label: string;
+    role?: string;
+    highlight?: boolean;
     x: number;
     y: number;
     w: number;
@@ -82,12 +105,23 @@ export class VrRuntime {
     error: "",
     arSupported: false,
     displayMode: "vr" as "vr" | "ar",
-    calibration: "none" as "none" | "a" | "b" | "checking" | "aligned" | "lost",
-    calibrationMessage: "位置合わせは端末ごとに行います。",
+    calibration: "none" as
+      | "none"
+      | "a"
+      | "b"
+      | "c"
+      | "checking"
+      | "aligned"
+      | "lost"
+      | "placing"
+      | "placed",
+    alignmentCheck: null as AlignmentCheck | null,
+    calibrationMessage: "机の枠は、Questを装着した運営者が配置します。",
     showCalibration: false,
     showVenue: false,
     venueView: "space" as "overview" | "space",
     overviewPlacement: 0,
+    inputMode: "controllers" as "controllers" | "hands",
   };
   private sessionMode: XRSessionMode | null = null;
   private floor: THREE.Mesh | null = null;
@@ -124,6 +158,8 @@ export class VrRuntime {
   private captureA: Vec3 | null = null;
   private captureHand = -1;
   private alignment: Alignment | null = null;
+  private placement: TablePlacement | null = null;
+  private rawHead = new THREE.Vector3();
   private rawOrientation = new THREE.Quaternion();
   private tipOffset = new THREE.Vector3(0, 0, -0.05);
   private cleanups: (() => void)[] = [];
@@ -150,7 +186,63 @@ export class VrRuntime {
   onSelect = (_id: FlightId) => {};
   onClear = () => {};
   onLocalRest: (() => void) | null = null;
+  /** Headset removal or a user switch hides the session; the page decides whether sound comes back. */
+  onLocalSuspend: (() => void) | null = null;
+  onLocalResume: (() => void) | null = null;
+  private suspended = false;
   sharedPanel: SharedVrPanel | null = null;
+  creationModel: {
+    begin: (controller: THREE.Group, ray: THREE.Ray) => boolean;
+    near: (point: THREE.Vector3) => boolean;
+    beginNear: (controller: THREE.Group, point: THREE.Vector3) => boolean;
+    end: (controller?: THREE.Group) => void;
+    command: (index: number) => void;
+    inspect: () => unknown;
+  } | null = null;
+  creationAnchor = new THREE.Vector3();
+  creationAnchorVersion = 0;
+
+  /** Component lab override. Shared rooms use the same hand/touch input contract. */
+  controlSurface: SpatialControlSurface | null = null;
+  private sharedSurface: SharedControlSurface | null = null;
+  private get surface() {
+    return this.controlSurface ?? this.sharedSurface;
+  }
+  private surfaceAt = 0;
+  private handInput: SpatialHandInput | null = null;
+  private panelGrab = new SpatialGrab();
+  private panelHandles: THREE.Group | null = null;
+  private radarGrab = new SpatialGrab();
+  private radarPlaced = false;
+  radarSource: (() => RadarSource) | null = null;
+  private radar: {
+    mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
+    surface: FlightRadarSurface;
+    hand: SpatialHandInput;
+    ctx: CanvasRenderingContext2D;
+    texture: THREE.CanvasTexture;
+    handles: THREE.Group;
+  } | null = null;
+  toggleRadar() {
+    if (!this.radar || !this.active) return;
+    const r = this.radar;
+    r.mesh.visible = !r.mesh.visible;
+    if (r.mesh.visible) {
+      this.surface?.close();
+      r.surface.recall();
+    } else {
+      this.radarGrab.end();
+      r.hand.reset();
+      this.surface?.recall();
+    }
+  }
+  private radarHandleNear(point: THREE.Vector3) {
+    return !!this.radar?.mesh.visible && nearPanelHandle(this.radar.mesh, point);
+  }
+  private panelHandleNear(point: THREE.Vector3) {
+    if (!this.panel?.visible || !this.sharedSurface?.expanded) return false;
+    return nearPanelHandle(this.panel, point);
+  }
 
   constructor(
     private experience: Experience,
@@ -216,6 +308,9 @@ export class VrRuntime {
         preferAR && this.snapshot.arSupported ? "immersive-ar" : "immersive-vr";
       const session = await navigator.xr.requestSession(mode, {
         requiredFeatures: ["local-floor"],
+        ...(this.controlSurface || this.sharedPanel
+          ? { optionalFeatures: ["hand-tracking"] }
+          : {}),
       });
       this.session = session;
       this.sessionMode = mode;
@@ -233,6 +328,8 @@ export class VrRuntime {
       this.snapshot = {
         ...this.snapshot,
         calibration: "none",
+        showCalibration: false,
+        alignmentCheck: null,
         calibrationMessage: "机の位置合わせを行ってください。",
       };
       this.cameraParent = this.camera.parent;
@@ -243,6 +340,8 @@ export class VrRuntime {
       this.frames = 0;
       this.views = 0;
       this.lastFrameAt = 0;
+      this.handInput?.reset();
+      this.surface?.setTouchCursors([]);
       this.frameIntervals = [];
       this.panelPlaced = false;
       this.audioPage = false;
@@ -302,11 +401,35 @@ export class VrRuntime {
     if (this.floor) this.floor.visible = displayMode !== "ar";
     this.state(this.snapshot.status);
   }
+  /** Open in its existing position; only explicit recall or a handle grab relocates it. */
+  showPanel() {
+    if (this.panel) this.panel.visible = true;
+    this.surface?.recall();
+  }
   hidePanel() {
+    this.panelGrab.end();
+    if (this.surface) {
+      this.surface.close();
+      return;
+    }
     if (this.panel) this.panel.visible = false;
   }
+  /** Explicit editing entry summons only the miniature; the user's placed menu stays fixed. */
+  recallCreation() {
+    if (!this.active || !this.tracked) return;
+    const f = new THREE.Vector3(0, 0, -1).applyQuaternion(this.rawOrientation);
+    const yaw = Math.atan2(-f.x, -f.z);
+    this.creationAnchor
+      .set(
+        this.rawHead.x - Math.sin(yaw) * 0.62,
+        Math.max(0.4, this.rawHead.y + 0.12),
+        this.rawHead.z - Math.cos(yaw) * 0.62,
+      )
+      .applyMatrix4(this.rig.matrixWorld);
+    this.creationAnchorVersion++;
+  }
   get panelVisible() {
-    return this.panel?.visible ?? false;
+    return this.sharedSurface?.expanded ?? this.panel?.visible ?? false;
   }
   /** A local presentation choice; never changes the rig, listener or room. */
   showVenue(view: "overview" | "space") {
@@ -324,12 +447,12 @@ export class VrRuntime {
     this.state(this.snapshot.status);
   }
   setTableFrame(key: string, frame: TableFrame) {
-    const nextKey = `${key}/${frame.baselineM}/${frame.tableHeightM}`;
+    const nextKey = `${key}/${frame.baselineM}/${frame.tableHeightM}/${tableDepth(frame)}`;
     if (this.frameKey === nextKey) return;
     const hadFrame = !!this.frameKey;
     this.frameKey = nextKey;
     this.frameConfig = { ...frame };
-    if (hadFrame && this.active)
+    if (hadFrame && this.active && this.snapshot.calibration !== "none")
       this.invalidateAlignment(
         "部屋か机の基準が変わりました。位置を合わせ直してください。",
       );
@@ -349,29 +472,100 @@ export class VrRuntime {
     this.pause();
     this.captureA = null;
     this.captureHand = -1;
+    this.placement = null;
     this.snapshot = {
       ...this.snapshot,
       displayMode: "ar",
-      showCalibration: true,
+      showCalibration: false,
       calibration: "a",
+      alignmentCheck: null,
       calibrationMessage:
         "手元の光る玉を机のAへ合わせ、トリガー。グリップで中止。",
     };
     if (this.floor) this.floor.visible = false;
     this.state(this.snapshot.status);
   }
+  /** Start from the operator's current physical pose, never the virtual origin. */
+  bringTableHere() {
+    if (
+      !this.canShowAR ||
+      !this.tracked ||
+      this.snapshot.status !== "presenting"
+    )
+      return;
+    this.pause();
+    this.captureA = null;
+    this.captureHand = -1;
+    this.placement = null;
+    const f = new THREE.Vector3(0, 0, -1).applyQuaternion(this.rawOrientation);
+    this.placement = tableInFront(
+      this.rawHead,
+      Math.atan2(-f.x, -f.z),
+      this.frameConfig,
+    );
+    this.applyPlacement();
+    this.panelPlaced = false;
+  }
+  adjustTable(x = 0, y = 0, z = 0, yaw = 0) {
+    if (
+      !this.placement ||
+      !this.tracked ||
+      !["placing", "placed"].includes(this.snapshot.calibration)
+    )
+      return;
+    this.placement = moveTable(this.placement, this.frameConfig, x, y, z, yaw);
+    this.applyPlacement();
+  }
+  private applyPlacement() {
+    if (!this.placement) return;
+    const a = placementAlignment(this.placement, this.frameConfig);
+    this.alignment = a;
+    this.rig.position.set(a.offset.x, a.offset.y, a.offset.z);
+    this.rig.rotation.set(0, a.yaw, 0);
+    this.rig.updateMatrixWorld(true);
+    if (this.floor) this.floor.visible = false;
+    this.snapshot = {
+      ...this.snapshot,
+      displayMode: "ar",
+      showCalibration: true,
+      calibration: "placing",
+      alignmentCheck: null,
+      calibrationMessage:
+        "仮置きです。A・Bを手前、C・Dを奥にして机へ重ねてください。",
+    };
+    this.state(this.snapshot.status);
+  }
+  confirmTablePlacement() {
+    if (
+      !this.placement ||
+      this.snapshot.calibration !== "placing" ||
+      !this.tracked
+    )
+      return;
+    this.snapshot = {
+      ...this.snapshot,
+      calibration: "placed",
+      calibrationMessage: "机を手動で配置しました（目視確認・誤差は未測定）。",
+    };
+    this.state(this.snapshot.status);
+  }
   confirmAlignment() {
-    if (this.snapshot.calibration !== "checking") return;
+    if (
+      this.snapshot.calibration !== "checking" ||
+      !this.snapshot.alignmentCheck?.acceptable
+    )
+      return;
     this.snapshot = {
       ...this.snapshot,
       calibration: "aligned",
-      calibrationMessage: "A・B・Cの重なりを確認済み（この端末のみ）。",
+      calibrationMessage: `位置合わせ確認済み / Cのずれ ${(this.snapshot.alignmentCheck.distanceM * 100).toFixed(1)} cm（この端末）`,
     };
     this.state(this.snapshot.status);
   }
   clearAlignment() {
     this.pause();
     this.alignment = null;
+    this.placement = null;
     this.captureA = null;
     this.rig.quaternion.identity();
     const p = this.savedListener;
@@ -380,20 +574,25 @@ export class VrRuntime {
     this.snapshot = {
       ...this.snapshot,
       calibration: "none",
+      alignmentCheck: null,
       calibrationMessage:
-        "位置合わせを解除しました。端末間の位置は未一致です。",
+        "机の配置を解除しました。目の前に呼んで、配置し直せます。",
+      showCalibration: false,
     };
     this.state(this.snapshot.status);
   }
   private invalidateAlignment(message: string) {
     this.captureA = null;
+    this.placement = null;
     this.alignment = null;
     this.pause();
     this.panelPlaced = false;
     if (this.panel) this.panel.visible = true;
+    this.surface?.recall();
     this.snapshot = {
       ...this.snapshot,
       calibration: "lost",
+      alignmentCheck: null,
       calibrationMessage: message,
     };
     this.state(this.snapshot.status);
@@ -405,6 +604,21 @@ export class VrRuntime {
       .clone()
       .applyQuaternion(grip.quaternion)
       .add(grip.position);
+    if (this.snapshot.calibration === "c" && this.alignment) {
+      if (index !== this.captureHand) return;
+      const check = checkAlignment(point, this.alignment, this.frameConfig);
+      this.snapshot = {
+        ...this.snapshot,
+        alignmentCheck: check,
+        calibration: "checking",
+        calibrationMessage: check.acceptable
+          ? `Cのずれ ${(check.distanceM * 100).toFixed(1)} cm。目印の重なりを見て「重なりを確認」。`
+          : `Cのずれ ${(check.distanceM * 100).toFixed(1)} cm。5 cmを超えました。A/B/Cの印を確認してやり直してください。`,
+      };
+      this.panelPlaced = false;
+      this.state(this.snapshot.status);
+      return;
+    }
     if (this.snapshot.calibration === "a") {
       this.captureA = { x: point.x, y: point.y, z: point.z };
       this.captureHand = index;
@@ -425,9 +639,10 @@ export class VrRuntime {
         this.panelPlaced = false;
         this.snapshot = {
           ...this.snapshot,
-          calibration: "checking",
+          calibration: "c",
+          showCalibration: true,
           calibrationMessage:
-            "A・B・Cの目印が重なるか確認し「重なりを確認」を押してください。",
+            "同じ手の光る玉をCへ合わせ、トリガー。CはAから奥へ、設定した奥行きの距離。",
         };
       } catch (error) {
         this.snapshot = {
@@ -455,15 +670,25 @@ export class VrRuntime {
   }
   private visibilityChange = () => {
     if (this.session?.visibilityState !== "visible") {
-      this.pause();
+      this.handInput?.reset();
+      this.surface?.setTouchCursors([]);
+      if (this.onLocalSuspend) {
+        this.onLocalSuspend();
+        this.audio.stop();
+      } else this.pause();
+      this.suspended = true;
       this.lastFrameAt = 0;
+    } else if (this.suspended) {
+      this.suspended = false;
+      this.onLocalResume?.();
     }
   };
   private referenceReset = () => {
     if (
       this.alignment ||
       this.snapshot.calibration === "a" ||
-      this.snapshot.calibration === "b"
+      this.snapshot.calibration === "b" ||
+      this.snapshot.calibration === "c"
     ) {
       this.invalidateAlignment(
         "追跡の原点が変わりました。机の位置を合わせ直してください。",
@@ -474,6 +699,9 @@ export class VrRuntime {
     this.panelPlaced = false;
   };
   private finish = () => {
+    this.panelGrab.end();
+    this.radarGrab.end();
+    this.creationModel?.end();
     if (this.savedListener) {
       this.pause();
       this.experience.setListener(this.savedListener);
@@ -488,21 +716,39 @@ export class VrRuntime {
       .getReferenceSpace()
       ?.removeEventListener("reset", this.referenceReset);
     this.cleanups.splice(0).forEach((fn) => fn());
+    this.handInput?.dispose();
+    this.radar?.hand.dispose();
+    this.radar?.handles.traverse(part => {
+      if (part instanceof THREE.Mesh) { part.geometry.dispose(); (part.material as THREE.Material).dispose(); }
+    });
+    this.radar?.mesh.removeFromParent();
+    this.radar?.mesh.geometry.dispose();
+    this.radar?.mesh.material.dispose();
+    this.radar?.texture.dispose();
+    this.radar = null;
+    this.handInput = null;
+    this.surface?.setTouchCursors([]);
+    this.surface?.setHands(false);
     if (this.camera?.parent === this.rig) {
       this.rig.remove(this.camera);
       this.cameraParent?.add(this.camera);
     }
     this.rig.removeFromParent();
+    this.sharedSurface = null;
+    this.placement = null;
     this.session = null;
     this.sessionMode = null;
     this.floor = null;
     this.snapshot = {
       ...this.snapshot,
       displayMode: "vr",
+      inputMode: "controllers",
       calibration: "none",
+      alignmentCheck: null,
       calibrationMessage: "再入場したら、机の位置を合わせてください。",
     };
     this.alignment = null;
+    this.placement = null;
     this.captureA = null;
     this.tracked = false;
     this.panel = null;
@@ -516,6 +762,52 @@ export class VrRuntime {
   };
 
   private createControls() {
+    if (this.radarSource) {
+      const canvas = document.createElement("canvas");
+      canvas.width = 1024;
+      canvas.height = 512;
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      const mesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(2.4, 1.2),
+        new THREE.MeshBasicMaterial({ map: texture, toneMapped: false }),
+      );
+      mesh.scale.setScalar(0.32);
+      mesh.visible = true;
+      this.radarPlaced = false;
+      const handles = createPanelHandles();
+      mesh.add(handles);
+      this.rig.add(mesh);
+      this.radar = {
+        mesh,
+        handles,
+        texture,
+        ctx: canvas.getContext("2d")!,
+        surface: new FlightRadarSurface(
+          () => this.radarSource!(),
+          () => {
+            mesh.visible = false;
+            this.radarGrab.end();
+            this.radar?.hand.reset();
+            this.surface?.recall();
+          },
+        ),
+        hand: new SpatialHandInput(this.rig, undefined, false),
+      };
+    }
+    this.sharedSurface = this.sharedPanel
+      ? new SharedControlSurface(
+          () => this.sharedPanel,
+          () => {
+            this.panelPlaced = false;
+          },
+          (kind) =>
+            this.audio.feedback(
+              kind,
+              this.panel?.getWorldPosition(new THREE.Vector3()),
+            ),
+        )
+      : null;
     const canvas = document.createElement("canvas");
     canvas.width = 1024;
     canvas.height = 512;
@@ -525,10 +817,36 @@ export class VrRuntime {
     texture.colorSpace = THREE.SRGBColorSpace;
     const panel = new THREE.Mesh(
       new THREE.PlaneGeometry(2.4, 1.2),
-      new THREE.MeshBasicMaterial({ map: texture, toneMapped: false }),
+      new THREE.MeshBasicMaterial({
+        map: texture,
+        toneMapped: false,
+        transparent: !!this.surface,
+        depthWrite: !this.surface,
+      }),
     );
     this.panel = panel;
+    const handles = createPanelHandles();
+    this.panelHandles = handles;
+    panel.add(handles);
+    this.surfaceAt = 0;
     this.rig.add(panel);
+    if (this.surface)
+      this.handInput = new SpatialHandInput(this.rig, {
+        palmNear: (point) => this.radarHandleNear(point) || this.panelHandleNear(point),
+        near: (point) =>
+          this.radarHandleNear(point) || this.panelHandleNear(point) || !!this.creationModel?.near(point),
+        begin: (anchor, point) =>
+          this.radarHandleNear(point)
+            ? this.radarGrab.begin(this.radar!.mesh, anchor)
+            : this.panelHandleNear(point)
+            ? this.panelGrab.begin(panel, anchor)
+            : !!this.creationModel?.beginNear(anchor, point),
+        end: (anchor) => {
+          this.panelGrab.end(anchor);
+          this.radarGrab.end(anchor);
+          this.creationModel?.end(anchor);
+        },
+      });
     const floor = new THREE.Mesh(
       new THREE.CircleGeometry(1.2, 48),
       new THREE.MeshBasicMaterial({
@@ -575,31 +893,118 @@ export class VrRuntime {
         new THREE.MeshBasicMaterial({ color: "#d9ffd3" }),
       );
       ray.rotation.x = Math.PI / 2;
+      ray.name = "pointer-ray";
       ray.position.z = -1.5;
       controller.add(ray);
       owned.push(ray);
-      const select = () => this.select(controller);
+      let source: XRInputSource | null = null;
+      const connected = (event: { data: XRInputSource }) => {
+        source = event.data;
+        controller.userData.avSource = source;
+      };
+      const disconnected = () => {
+        this.panelGrab.end(controller);
+        this.panelGrab.end(grip);
+        this.radarGrab.end(controller);
+        this.radarGrab.end(grip);
+        this.creationModel?.end(controller);
+        source = null;
+        delete controller.userData.avSource;
+      };
+      const select = () => {
+        if (
+          source?.hand &&
+          this.handInput &&
+          (!this.handInput.allowPinch(source) ||
+            (this.radar?.mesh.visible && !this.radar.hand.allowPinch(source)))
+        )
+          return;
+        this.select(controller);
+      };
       const recall = () => {
+        // Hand sources may emit squeeze while changing gesture; this is not a recall command.
+        if (source?.hand) return;
+        grip.updateWorldMatrix(true, false);
+        if (this.radarHandleNear(grip.getWorldPosition(new THREE.Vector3()))) {
+          this.radarGrab.begin(this.radar!.mesh, grip);
+          return;
+        }
+        if (
+          this.panel &&
+          this.panelHandleNear(grip.getWorldPosition(new THREE.Vector3()))
+        ) {
+          this.panelGrab.begin(this.panel, grip);
+          return;
+        }
+        controller.updateWorldMatrix(true, false);
+        this.raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+        this.raycaster.ray.direction
+          .set(0, 0, -1)
+          .transformDirection(controller.matrixWorld);
+        if (this.radar?.mesh.visible && this.raycaster.intersectObject(this.radar.handles, true).length) {
+          this.radarGrab.begin(this.radar.mesh, controller);
+          return;
+        }
+        if (
+          this.panel?.visible &&
+          this.panelHandles?.visible &&
+          this.raycaster.intersectObject(this.panelHandles, true).length
+        ) {
+          this.panelGrab.begin(this.panel, controller);
+          return;
+        }
         if (
           this.snapshot.calibration === "a" ||
-          this.snapshot.calibration === "b"
+          this.snapshot.calibration === "b" ||
+          this.snapshot.calibration === "c"
         )
           this.invalidateAlignment(
             "位置合わせを中止しました。開始からやり直せます。",
           );
         this.panelPlaced = false;
         if (this.panel) this.panel.visible = true;
+        this.surface?.recall();
       };
+      const release = () => {
+        this.creationModel?.end(controller);
+        this.panelGrab.end(controller);
+        this.radarGrab.end(controller);
+      };
+      const releaseGrip = () => {
+        this.radarGrab.end(grip);
+        this.radarGrab.end(controller);
+        this.panelGrab.end(grip);
+        this.panelGrab.end(controller);
+      };
+      controller.addEventListener("squeezeend", releaseGrip);
+      controller.addEventListener("selectend", release);
       controller.addEventListener("selectstart", select);
+      controller.addEventListener("connected", connected);
+      controller.addEventListener("disconnected", disconnected);
       controller.addEventListener("squeezestart", recall);
       this.cleanups.push(() => {
+        release();
+        releaseGrip();
+        controller.removeEventListener("squeezeend", releaseGrip);
+        controller.removeEventListener("selectend", release);
         controller.removeEventListener("selectstart", select);
+        controller.removeEventListener("connected", connected);
+        controller.removeEventListener("disconnected", disconnected);
         controller.removeEventListener("squeezestart", recall);
         controller.removeFromParent();
+        delete controller.userData.avSource;
         grip.removeFromParent();
       });
     }
     this.cleanups.push(() => {
+      handles.traverse((part) => {
+        if (part instanceof THREE.Mesh) {
+          part.geometry.dispose();
+          (part.material as THREE.Material).dispose();
+        }
+      });
+      handles.removeFromParent();
+      this.panelHandles = null;
       texture.dispose();
       owned.forEach((mesh) => {
         mesh.removeFromParent();
@@ -618,7 +1023,8 @@ export class VrRuntime {
       return;
     if (
       this.snapshot.calibration === "a" ||
-      this.snapshot.calibration === "b"
+      this.snapshot.calibration === "b" ||
+      this.snapshot.calibration === "c"
     ) {
       this.capturePoint(this.controls.indexOf(controller));
       return;
@@ -628,13 +1034,50 @@ export class VrRuntime {
     this.raycaster.ray.direction
       .set(0, 0, -1)
       .transformDirection(controller.matrixWorld);
+    if (this.radar?.mesh.visible) {
+      const handle = this.raycaster.intersectObject(this.radar.handles, true)[0];
+      if (handle && handle.distance < 2) {
+        this.radarGrab.begin(this.radar.mesh, controller);
+        return;
+      }
+      const hit = this.raycaster.intersectObject(this.radar.mesh)[0];
+      let main = this.panel?.visible
+        ? this.raycaster.intersectObject(this.panel)[0]
+        : undefined;
+      if (
+        main?.uv &&
+        this.sharedSurface &&
+        !this.sharedSurface.expanded &&
+        (1 - main.uv.y) * 512 < 426
+      )
+        main = undefined;
+      if (hit?.uv && (!main || hit.distance < main.distance)) {
+        this.radar.surface.select(hit.uv.x * 1024, (1 - hit.uv.y) * 512);
+        return;
+      }
+    }
     if (this.panel?.visible) {
       this.panel.updateWorldMatrix(true, false);
+      if (
+        this.panelHandles?.visible &&
+        this.raycaster.intersectObject(this.panelHandles, true).length
+      ) {
+        // Deliberate ray pinch on the visible handle also works when it is just beyond reach.
+        if (
+          !(controller.userData.avSource as XRInputSource | undefined)?.hand ||
+          this.raycaster.intersectObject(this.panelHandles, true)[0].distance <
+            2
+        )
+          this.panelGrab.begin(this.panel, controller);
+        return;
+      }
       const hit = this.raycaster.intersectObject(this.panel)[0];
       if (hit?.uv) {
         const x = hit.uv.x * 1024,
           y = (1 - hit.uv.y) * 512;
-        if (this.sharedPanel) {
+        if (this.surface) {
+          if (this.surface.select(x, y)) return;
+        } else if (this.sharedPanel) {
           const shared = this.sharedPanel.buttons.find(
             (b) => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h,
           );
@@ -642,13 +1085,16 @@ export class VrRuntime {
           this.panelAt = 0;
           return;
         }
-        const button = (this.audioPage ? AUDIO_BUTTONS : BUTTONS).find(
-          (b) => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h,
-        );
-        if (button) this.act(button.action);
-        return;
+        if (!this.surface) {
+          const button = (this.audioPage ? AUDIO_BUTTONS : BUTTONS).find(
+            (b) => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h,
+          );
+          if (button) this.act(button.action);
+          return;
+        }
       }
     }
+    if (this.creationModel?.begin(controller, this.raycaster.ray)) return;
     let nearest: { id: FlightId; along: number } | null = null;
     for (const id of this.experience.flightIds) {
       if (!aircraftInfo(this.experience, id)?.visible) continue;
@@ -701,6 +1147,11 @@ export class VrRuntime {
     const pose = reference && frame.getViewerPose(reference);
     this.tracked = !!pose && this.session.visibilityState === "visible";
     if (!this.tracked || !pose) {
+      this.panelGrab.end();
+      this.radarGrab.end();
+      this.creationModel?.end();
+      this.handInput?.reset();
+      this.surface?.setTouchCursors([]);
       if (this.alignment || this.captureA || this.snapshot.calibration === "a")
         this.invalidateAlignment(
           "追跡を見失いました。机の位置を合わせ直してください。",
@@ -710,6 +1161,7 @@ export class VrRuntime {
       return true;
     }
     const { position, orientation } = pose.transform;
+    this.rawHead.copy(position);
     this.rig.updateMatrixWorld(true);
     this.position
       .set(position.x, position.y, position.z)
@@ -735,18 +1187,101 @@ export class VrRuntime {
       if (this.frameIntervals.length > 600) this.frameIntervals.shift();
     }
     this.lastFrameAt = performance.now();
+    const hands =
+      !!this.surface && [...this.session.inputSources].some((s) => !!s.hand);
+    if ((this.snapshot.inputMode === "hands") !== hands) {
+      this.snapshot = {
+        ...this.snapshot,
+        inputMode: hands ? "hands" : "controllers",
+      };
+      this.surface?.setHands(hands);
+      if (hands && ["a", "b", "c"].includes(this.snapshot.calibration))
+        this.invalidateAlignment(
+          "測定を中止しました。コントローラーでやり直すか、机の枠を手動で配置してください。",
+        );
+      this.state(this.snapshot.status);
+    }
+    const editing = !!this.creationModel && !!this.sharedSurface;
+    // Device discovery, editing and flight transitions never move an already placed board.
     if (!this.panelPlaced && this.panel) {
+      this.panelGrab.end();
       const localForward = this.scratch
         .set(0, 0, -1)
         .applyQuaternion(this.rawOrientation);
       const yaw = Math.atan2(-localForward.x, -localForward.z);
       this.panel.rotation.set(0, yaw, 0);
+      // Reachable with bare hands even if controllers were discovered first.
+      this.panel.scale.setScalar(editing ? 0.23 : 0.3);
+      const distance = editing ? 0.72 : 0.64;
+      const side = editing ? 0.24 : 0;
       this.panel.position.set(
-        -Math.sin(yaw) * 2.8 + position.x,
-        Math.max(0.75, position.y - 0.45),
-        -Math.cos(yaw) * 2.8 + position.z,
+        -Math.sin(yaw) * distance + Math.cos(yaw) * side + position.x,
+        Math.max(0.35, position.y - 0.16),
+        -Math.cos(yaw) * distance - Math.sin(yaw) * side + position.z,
       );
+      this.panel.rotation.y = yaw - Math.atan2(side, distance);
       this.panelPlaced = true;
+      // Independent of the panel: the aircraft stays centred and within arm's reach.
+      this.creationAnchor
+        .set(
+          -Math.sin(yaw) * 0.62 + position.x,
+          Math.max(0.4, position.y + 0.12),
+          -Math.cos(yaw) * 0.62 + position.z,
+        )
+        .applyMatrix4(this.rig.matrixWorld);
+      this.creationAnchorVersion++;
+    }
+    if (this.handInput && reference && this.panel && this.surface)
+      this.handInput.update(
+        frame,
+        reference,
+        [...this.session.inputSources],
+        this.panel,
+        this.surface,
+      );
+    if (this.panelHandles) {
+      this.panelHandles.visible = !!this.sharedSurface?.expanded;
+      highlightPanelHandles(
+        this.panelHandles,
+        this.panelGrab.active ||
+          !!this.handInput?.diagnostics.some(
+            (h) =>
+              h.grip &&
+              this.panelHandleNear(new THREE.Vector3().fromArray(h.grip)),
+          ),
+      );
+    }
+    if (this.radar?.mesh.visible) {
+      if (!this.radarPlaced) {
+        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.rawOrientation);
+        const yaw = Math.atan2(-forward.x, -forward.z);
+        this.radar.mesh.position.set(
+          position.x - Math.sin(yaw) * 0.64 + Math.cos(yaw) * 0.78,
+          Math.max(0.45, position.y + 0.02),
+          position.z - Math.cos(yaw) * 0.64 - Math.sin(yaw) * 0.78,
+        );
+        this.radar.mesh.rotation.set(0, yaw - Math.atan2(0.78, 0.64), 0);
+        this.radarPlaced = true;
+      }
+      highlightPanelHandles(this.radar.handles, this.radarGrab.active || !!this.handInput?.diagnostics.some(h => h.grip && this.radarHandleNear(new THREE.Vector3().fromArray(h.grip))));
+      if (reference)
+        this.radar.hand.update(
+          frame,
+          reference,
+          [...this.session.inputSources],
+          this.radar.mesh,
+          this.radar.surface,
+        );
+      if (this.radar.surface.draw(this.radar.ctx, 1 / 60))
+        this.radar.texture.needsUpdate = true;
+    }
+    if (!this.sharedSurface?.expanded) this.panelGrab.end();
+    this.panelGrab.update();
+    this.radarGrab.update();
+    for (const controller of this.controls) {
+      const ray = controller.getObjectByName("pointer-ray");
+      if (ray)
+        ray.visible = !this.handInput?.isNear(controller.userData.avSource);
     }
     return true;
   }
@@ -760,6 +1295,7 @@ export class VrRuntime {
       tip.visible =
         this.snapshot.calibration === "a" ||
         this.snapshot.calibration === "b" ||
+        this.snapshot.calibration === "c" ||
         this.snapshot.calibration === "checking";
     if (!this.session || !this.panel || !this.ctx || !this.marker) return;
     const info = selected ? aircraftInfo(this.experience, selected) : null;
@@ -777,6 +1313,14 @@ export class VrRuntime {
           this.experience.designFor(info.id).bodyLengthM,
         ) * 0.7,
       );
+    }
+    if (this.surface) {
+      const now = performance.now();
+      const dt = this.surfaceAt ? (now - this.surfaceAt) / 1000 : 0;
+      this.surfaceAt = now;
+      if (this.surface.draw(this.ctx, dt))
+        this.panel.material.map!.needsUpdate = true;
+      return;
     }
     if (performance.now() - this.panelAt < 200) return;
     this.panelAt = performance.now();
@@ -951,7 +1495,7 @@ export class VrRuntime {
       sessionMode: this.sessionMode,
       environmentBlendMode: this.session?.environmentBlendMode ?? null,
       canShowAR: this.canShowAR,
-      panelVisible: this.panel?.visible ?? false,
+      panelVisible: this.panelVisible,
       frames: this.frames,
       views: this.views,
       tracked: this.tracked,
@@ -967,6 +1511,8 @@ export class VrRuntime {
       origin: this.rig.position.toArray(),
       yaw: this.rig.rotation.y,
       alignment: this.alignment,
+      placement: this.placement,
+      rawHead: this.rawHead.toArray(),
       table: this.frameConfig,
       captureA: this.captureA,
       gripPoints: this.grips.map((g) =>
@@ -980,13 +1526,39 @@ export class VrRuntime {
       frameMsP50: sorted[Math.floor(sorted.length * 0.5)] ?? null,
       frameMsP95: sorted[Math.floor(sorted.length * 0.95)] ?? null,
       panel: panel
-        ? { matrix: panel.matrixWorld.toArray(), width: 2.4, height: 1.2 }
+        ? {
+            matrix: panel.matrixWorld.toArray(),
+            width: 2.4,
+            height: 1.2,
+            visible: panel.visible,
+          }
         : null,
       selected: this.selected,
       selectionMarkerVisible: this.marker?.visible ?? false,
       soundOn: this.soundOn,
       audioPage: this.audioPage,
+      creationModel: this.creationModel?.inspect() ?? null,
       sharedPage: this.sharedPanel?.title ?? null,
+      radar: this.radar
+        ? {
+            visible: this.radar.mesh.visible,
+            matrix: this.radar.mesh.matrixWorld.toArray(),
+            width: 2.4,
+            height: 1.2,
+            ...this.radar.surface.diagnostics,
+            held: this.radarGrab.active,
+            handles: PANEL_HANDLES.map(x => this.radar!.mesh.localToWorld(new THREE.Vector3(x, 0.05, 0.01)).toArray()),
+          }
+        : null,
+      controls: this.surface?.diagnostics ?? null,
+      hands: this.handInput?.diagnostics ?? [],
+      panelHeld: this.panelGrab.active,
+      panelHandles:
+        panel && this.panelHandles?.visible
+          ? PANEL_HANDLES.map((x) =>
+              panel.localToWorld(new THREE.Vector3(x, 0.05, 0.01)).toArray(),
+            )
+          : [],
     };
   }
 }

@@ -1,0 +1,19 @@
+{
+  "renderer": "Remotion 4.0.526",
+  "fps": 60,
+  "width": 1280,
+  "height": 720,
+  "frames": 540,
+  "durationSeconds": 9,
+  "source": "apps/desktop/src/ui/MotionArtwork.tsx",
+  "motion": "packages/core/src/menu-motion.ts",
+  "note": "Designed motion studies. VR clips are spatial UI illustrations, not headset recordings.",
+  "files": [
+    "pc-lift.mp4",
+    "pc-trail.mp4",
+    "pc-ripple.mp4",
+    "vr-lift.mp4",
+    "vr-trail.mp4",
+    "vr-ripple.mp4"
+  ]
+}

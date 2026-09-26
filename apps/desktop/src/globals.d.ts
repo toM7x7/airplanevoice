@@ -7,6 +7,7 @@ interface Window {
     geometries: number;
     textures: number;
     appearance: "procedural-v2";
+    soundTrace?: { mode: string; segments: number; lineSegments: number };
     environment: boolean;
   };
   __soundTrailTargets?: import("./Scene").AircraftTarget[];

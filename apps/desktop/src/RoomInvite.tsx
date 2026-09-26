@@ -48,9 +48,9 @@ export function RoomInvite({
   return (
     <details className="room-invite">
       <summary>
-        {exhibition ? "展示のQR・編集者の招待" : "Quest・もう一台を招待"}
+        {client.cloud ? "共通の入口・Quest用QR" : exhibition ? "展示のQR・編集者の招待" : "Quest・もう一台を招待"}
       </summary>
-      {exhibition && (
+      {exhibition && !client.cloud && (
         <label>
           招待する人
           <select
@@ -58,16 +58,16 @@ export function RoomInvite({
             value={visitorQr ? "visitor" : "editor"}
             onChange={(event) => setVisitorQr(event.target.value === "visitor")}
           >
-            <option value="visitor">来場者（観覧のみ）</option>
+            <option value="visitor">来場者（観覧・自分の一機を制作）</option>
             <option value="editor">運営（飛行を編集できる）</option>
           </select>
         </label>
       )}
-      {exhibition && (
+      {exhibition && !client.cloud && (
         <p>
           {visitorQr
-            ? "来場者用QR。展示時間中は何度でも入り直せます。"
-            : "運営用です。来場者には観覧用QRを渡してください。"}
+            ? "来場者用QR。自分の一機を作って飛ばせます。展示時間中は何度でも入り直せます。"
+            : "運営用です。来場者には来場者用QRを渡してください。"}
         </p>
       )}
       {qr && <img src={qr} alt="共有する部屋の招待QR" />}
@@ -83,9 +83,8 @@ export function RoomInvite({
         招待URLをコピー
       </button>
       <p>
-        同じURLで入り直せます。部屋の期限は{" "}
-        {new Date(expiresAt).toLocaleTimeString("ja-JP")}
-        。QRの読み取りには{" "}
+        {client.cloud ? "このURLから、いつでも同じ展示空間に入れます。保存した機体も共通です。" : `同じURLで入り直せます。部屋の期限は ${new Date(expiresAt).toLocaleTimeString("ja-JP")}。`}
+        QRの読み取りには{" "}
         <a href="https://xrqr.net/" target="_blank" rel="noreferrer">
           XRQR
         </a>{" "}

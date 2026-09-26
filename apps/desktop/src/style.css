@@ -1981,3 +1981,14 @@ input[type="range"] {
 .audio-levels small {
   width: 65px;
 }
+
+.creation-shelf { margin-block: 1rem; padding: 1rem; border: 1px solid #bfd4df; border-radius: 14px; background: #f4f9fc; color: #163345; }
+.creation-shelf h2 { font-size: 1.1rem; }
+.creation-shelf h3 { font-size: .95rem; margin-top: 1.2rem; }
+.creation-shelf label { display: grid; gap: .35rem; margin: .65rem 0; }
+.creation-shelf input { max-width: 100%; min-width: 0; }
+.creation-shelf input[type=range] { width: 100%; }
+.creation-shelf button { margin: .2rem; min-height: 38px; }
+.creation-shelf ul { padding-left: 1rem; }
+.creation-shelf li { padding-block: .5rem; border-bottom: 1px solid #d4e0e8; overflow-wrap: anywhere; }
+.creation-shelf fieldset { min-width: 0; margin-top: 1rem; }

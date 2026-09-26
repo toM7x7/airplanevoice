@@ -1,0 +1,31 @@
+import {chromium} from "playwright";
+import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+const out=process.env.SPACE_OUTPUT||"output/xr-rework/space";await fs.mkdir(out,{recursive:true});
+const browser=await chromium.launch({headless:true,args:["--use-angle=d3d11","--autoplay-policy=no-user-gesture-required"]});
+const page=await browser.newPage({viewport:{width:1440,height:1000}}), errors=[];
+page.on("pageerror",e=>errors.push(e.message));const state=()=>page.evaluate(()=>JSON.parse(window.render_game_to_text()));
+try{
+ await page.goto(process.env.SHARED_URL||"http://127.0.0.1:8789/?shared=1");
+ await page.getByRole("button",{name:"風の環境音 オフ",exact:true}).click();
+ await page.waitForFunction(()=>{const a=JSON.parse(window.render_game_to_text()).audio;return a.state==='running'&&a.levels.output.rms>0.00001;});
+ assert((await state()).audio.space.ambience);
+ const cues=(await state()).audio.space.cues;
+ await page.getByRole("button",{name:"右へ回す",exact:true}).click();
+ assert((await state()).audio.space.cues>cues);
+ await page.getByRole("button",{name:"操作音 オン",exact:true}).click();const stopped=(await state()).audio.space.cues;
+ await page.getByRole("button",{name:"左へ回す",exact:true}).click();assert.equal((await state()).audio.space.cues,stopped);
+ await page.getByRole("button",{name:"風の環境音 オン",exact:true}).click();assert(!(await state()).audio.space.ambience);
+ await page.locator('.workbench [data-creation-action="fly"]').click();
+ await page.waitForFunction(()=>JSON.parse(window.render_game_to_text()).phase==='FLY');
+ const start=await state();assert(start.room.state.flights[0].departure);assert(start.room.state.exhibition.repeat);
+ await page.waitForTimeout(3500);await page.screenshot({path:out+"/runway-roll.png"});
+ const roll=await state();assert(roll.aircraft.position.y<10);
+ await page.waitForTimeout(11000);await page.screenshot({path:out+"/climb.png"});assert((await state()).aircraft.position.y>10);
+ await page.getByRole("button",{name:"この機体を編集",exact:true}).click();
+ await page.getByRole("group",{name:"背景を見比べる"}).getByRole("button",{name:"飛行中の空",exact:true}).click();
+ assert.equal((await state()).presentation.background,"live");assert.equal((await state()).phase,"FLY");
+ await page.screenshot({path:out+"/live-edit.png"});
+ assert.deepEqual(errors,[]);await fs.writeFile(out+"/result.json",JSON.stringify({checks:["ambient produces a nonzero signal","UI cue on/off","shared runway roll and climb","new room repeats automatically","edit against live flight"],errors},null,2));
+ console.log('PASS ambience / UI sounds / runway roll / climb / live editing');
+}finally{await browser.close();}
